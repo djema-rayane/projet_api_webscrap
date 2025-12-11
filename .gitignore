@@ -1,4 +1,20 @@
+# Environnement virtuel
 .venv/
+
+# Cache Python
 __pycache__/
 *.pyc
+
+# VSCode
 .vscode/
+
+# Fichiers inutiles
+*.log
+*.tmp
+
+# Selenium
+selenium-screenshots/
+
+# Jupyter
+.ipynb_checkpoints/
+

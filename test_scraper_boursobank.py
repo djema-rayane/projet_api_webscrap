@@ -1,12 +1,12 @@
-# test_scraper_trustpilot.py
+# test_scraper_boursobank.py
 
 from src.scraper.trustpilot_scraper import scrape_trustpilot_to_df
 
+
 def main():
-    # Tu peux changer le domaine ici
-    domain = "carhartt-wip.com"      # ou "boursobank.com"
+    domain = "boursobank.com"   # <-- ici Boursobank
     lang = "fr"
-    max_pages = 1                    # mets None pour toutes les pages
+    max_pages = 1               # mets None pour toutes les pages
 
     df = scrape_trustpilot_to_df(domain, lang=lang, max_pages=max_pages)
 
@@ -16,6 +16,7 @@ def main():
     output_file = f"trustpilot_{domain.replace('.', '_')}_{lang}.csv"
     df.to_csv(output_file, index=False)
     print(f"CSV sauvegardé : {output_file}")
+
 
 if __name__ == "__main__":
     main()
