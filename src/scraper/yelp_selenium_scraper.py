@@ -36,11 +36,10 @@ def scrape_yelp_reviews_selenium(
     headless: bool = True,
 ) -> pd.DataFrame:
     """
-    Scrape UNIQUEMENT les textes d'avis Yelp pour une page business donnée.
+    Scrape les avis Yelp (texte + nom + date) pour une page business donnée.
     """
-
     driver = _init_driver(headless=headless)
-    all_texts: list[str] = []
+    all_data = []
 
     try:
         for page in range(max_pages):
@@ -53,24 +52,56 @@ def scrape_yelp_reviews_selenium(
             driver.get(url)
             time.sleep(sleep_between)
 
-            html = driver.page_source
-            soup = BeautifulSoup(html, "html.parser")
+            soup = BeautifulSoup(driver.page_source, "html.parser")
 
-            # Les avis textuels sont dans des spans raw__09f24__xxx
+            # Texte d'avis : span.raw__09f24__...
             span_texts = soup.find_all("span", class_=re.compile(r"raw__09f24__"))
             print(f"  Nombre de spans trouvés : {len(span_texts)}")
 
             nb_added = 0
+
             for sp in span_texts:
                 txt = sp.get_text(" ", strip=True)
-                if not txt:
+                if not txt or len(txt) < 80:
                     continue
 
-                # garder uniquement de vrais avis : longueur minimale 80 caractères
-                if len(txt) < 80:
+                # 🔹 Remonter au conteneur "avis"
+                review_block = sp.find_parent("li") or sp.find_parent("div")
+                if not review_block:
                     continue
 
-                all_texts.append(txt)
+                # ✅ Nom : div[role="region"][aria-label]
+                nom = None
+                author_div = review_block.select_one('div[role="region"][aria-label]')
+                if author_div:
+                    nom = author_div.get("aria-label")
+
+                # ✅ Date : sélecteur exact trouvé dans ton HTML
+                date = None
+                date_span = review_block.select_one("span.y-css-nju7ub")
+                if date_span:
+                    date = date_span.get_text(strip=True)
+                else:
+                    # fallback : <time> si un jour Yelp l'utilise
+                    time_tag = review_block.find("time")
+                    if time_tag:
+                        date = time_tag.get("datetime") or time_tag.get_text(strip=True)
+                    else:
+                        # fallback ultime : une vraie date contenant une année (moins fiable)
+                        candidates = review_block.find_all("span")
+                        for c in candidates:
+                            t = c.get_text(" ", strip=True)
+                            if re.search(r"\b\d{4}\b", t) and len(t) <= 25:
+                                date = t
+                                break
+
+                all_data.append(
+                    {
+                        "Nom": nom,
+                        "Date": date,
+                        "Avis": txt,
+                    }
+                )
                 nb_added += 1
 
             print(f"  Avis ajoutés sur cette page : {nb_added}")
@@ -81,5 +112,4 @@ def scrape_yelp_reviews_selenium(
     finally:
         driver.quit()
 
-    df = pd.DataFrame({"Avis": all_texts})
-    return df
+    return pd.DataFrame(all_data)

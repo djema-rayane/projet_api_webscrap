@@ -21,7 +21,7 @@ def main():
     print("Nombre d'avis récupérés :", len(df))
     print(df.head())
 
-    output_file = "yelp_reviews_selenium_page1.csv"
+    output_file = "yelp_reviews_selenium_page2.csv"
     df.to_csv(output_file, index=False)
     print(f"CSV sauvegardé : {output_file}")
 
