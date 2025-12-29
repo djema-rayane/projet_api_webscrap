@@ -1,7 +1,3 @@
-# ========================================
-# FILE 1: scraper.py
-# ========================================
-
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
@@ -17,51 +13,44 @@ from datetime import datetime
 class AmazonReviewScraper:
     """
     Scraper Amazon (FR) - Gestion complète du scraping
+    Supporte 2 modes:
+    - Mode recherche: scrape plusieurs produits via une recherche
+    - Mode URL: scrape un seul produit via son URL
     """
 
-    def __init__(self, profile_dir="~/.selenium_profiles/amazon", headless=False, wait_seconds=15):
-        """
-        Initialise le scraper avec les bonnes pratiques Selenium
-        
-        Args:
-            profile_dir: dossier pour stocker le profil Chrome
-            headless: True = mode invisible, False = voir le navigateur
-            wait_seconds: temps max d'attente pour les éléments
-        """
+    def __init__(self, profile_dir=None, headless=False, wait_seconds=15):
         self.options = webdriver.ChromeOptions()
-        
-        # Arguments de stabilité
         self.options.add_argument("--no-sandbox")
         self.options.add_argument("--disable-dev-shm-usage")
         self.options.add_argument("--window-size=1920,1080")
         
-        # Profil persistant
-        self.profile_path = os.path.expanduser(profile_dir)
-        self.options.add_argument(f"--user-data-dir={self.profile_path}")
-        self.options.add_argument("--profile-directory=Default")
+        # Désactiver la restauration de session
+        self.options.add_argument("--disable-session-crashed-bubble")
+        self.options.add_argument("--disable-restore-session-state")
+        self.options.add_argument("--disable-infobars")
         
-        # Mode headless si demandé
+        # CORRECTION: Profil optionnel
+        # Si profile_dir=None, Chrome démarre sans profil (session temporaire)
+        if profile_dir:
+            self.profile_path = os.path.expanduser(profile_dir)
+            self.options.add_argument(f"--user-data-dir={self.profile_path}")
+            self.options.add_argument("--profile-directory=Default")
+        
         if headless:
             self.options.add_argument("--headless=new")
         
-        # Lancer Chrome
         self.driver = webdriver.Chrome(options=self.options)
         self.wait = WebDriverWait(self.driver, wait_seconds)
-        
-        # Callback pour mettre à jour la progression (sera défini par l'API)
         self.progress_callback = None
 
     def set_progress_callback(self, callback):
-        """Définir une fonction de callback pour la progression"""
         self.progress_callback = callback
 
     def _update_progress(self, message):
-        """Mise à jour de la progression"""
         if self.progress_callback:
             self.progress_callback(message)
 
     def accept_cookies_if_present(self):
-        """Accepte les cookies si la popup apparaît"""
         try:
             button = WebDriverWait(self.driver, 5).until(
                 EC.element_to_be_clickable((By.ID, "sp-cc-accept"))
@@ -73,28 +62,22 @@ class AmazonReviewScraper:
             pass
 
     def open_amazon(self):
-        """Ouvrir Amazon France"""
         self._update_progress("Ouverture d'Amazon.fr")
         self.driver.get("https://www.amazon.fr")
         self.accept_cookies_if_present()
 
     def search(self, query: str):
-        """Rechercher un produit"""
         self._update_progress(f"Recherche de '{query}'")
-        
         search_bar = self.wait.until(
             EC.presence_of_element_located((By.ID, "twotabsearchtextbox"))
         )
-        
         search_bar.clear()
         search_bar.send_keys(query)
         search_bar.send_keys(Keys.RETURN)
         time.sleep(2)
-        
         self._update_progress("Résultats affichés")
 
     def count_products_on_page(self):
-        """Compter le nombre de produits sur la page actuelle"""
         products = self.driver.find_elements(
             By.CSS_SELECTOR, 
             "div.a-section.puis-padding-left-small.puis-padding-right-small"
@@ -107,9 +90,7 @@ class AmazonReviewScraper:
         return len(products)
 
     def click_next_page(self):
-        """Cliquer sur le bouton 'Suivant'"""
         self._update_progress("Passage à la page suivante...")
-        
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(1)
         
@@ -122,7 +103,6 @@ class AmazonReviewScraper:
         for selector in next_button_selectors:
             try:
                 next_button = self.driver.find_element(By.CSS_SELECTOR, selector)
-                
                 classes = next_button.get_attribute("class") or ""
                 if "disabled" in classes or "s-pagination-disabled" in classes:
                     self._update_progress("Dernière page atteinte")
@@ -143,18 +123,16 @@ class AmazonReviewScraper:
                     return True
                 except TimeoutException:
                     return False
-                
             except (NoSuchElementException, Exception):
                 continue
-        
         return False
 
     def extract_brand(self):
-        """Extraire la marque du produit"""
+        """Extraire la marque du produit (compatible mode recherche et URL)"""
         brand = "Marque non disponible"
         
         try:
-            # Méthode 1: Structure a-span3 / a-span9
+            # Méthode 1: Structure a-span3 / a-span9 (pages d'avis)
             label_elements = self.driver.find_elements(By.CSS_SELECTOR, "span.a-span3")
             for label_elem in label_elements:
                 label_text = label_elem.text.strip().lower()
@@ -168,7 +146,40 @@ class AmazonReviewScraper:
                     except:
                         continue
             
-            # Méthode 2: Extraction depuis l'URL
+            # Méthode 2: bylineInfo (page produit)
+            try:
+                byline = self.driver.find_element(By.ID, "bylineInfo")
+                brand_text = byline.text.strip()
+                if ":" in brand_text:
+                    brand = brand_text.split(":")[-1].strip()
+                elif "Visiter" in brand_text:
+                    brand = brand_text.replace("Visiter la boutique", "").strip()
+                else:
+                    brand = brand_text
+                
+                if brand and len(brand) < 50:
+                    return brand
+            except:
+                pass
+            
+            # Méthode 3: Tableaux de détails techniques
+            try:
+                table_rows = self.driver.find_elements(By.CSS_SELECTOR, "tr")
+                for row in table_rows:
+                    try:
+                        label_cell = row.find_element(By.CSS_SELECTOR, "th")
+                        label_text = label_cell.text.strip().lower()
+                        if "marque" in label_text or "brand" in label_text or "fabricant" in label_text:
+                            value_cell = row.find_element(By.CSS_SELECTOR, "td")
+                            brand = value_cell.text.strip()
+                            if brand:
+                                return brand
+                    except:
+                        continue
+            except:
+                pass
+            
+            # Méthode 4: Extraction depuis l'URL
             current_url = self.driver.current_url
             url_brand_match = re.search(r'/([^/]+)/dp/', current_url)
             if url_brand_match:
@@ -177,16 +188,37 @@ class AmazonReviewScraper:
                 if len(potential_brand) > 2:
                     brand = potential_brand
                     return brand
-            
         except Exception:
             pass
         
         return brand
 
-    def click_product_reviews(self, product_index=1):
-        """Cliquer sur le lien des avis d'un produit"""
-        self._update_progress(f"Accès aux avis du produit #{product_index}")
+    def extract_product_title(self):
+        """Extraire le titre du produit (compatible mode recherche et URL)"""
+        product_title = "Titre non disponible"
         
+        try:
+            # Méthode 1: Page produit (ID productTitle)
+            title_element = self.driver.find_element(By.ID, "productTitle")
+            product_title = title_element.text.strip()
+            if product_title:
+                return product_title
+        except NoSuchElementException:
+            pass
+        
+        try:
+            # Méthode 2: Page produit (h1 span)
+            title_element = self.driver.find_element(By.CSS_SELECTOR, "h1 span")
+            product_title = title_element.text.strip()
+            if product_title:
+                return product_title
+        except:
+            pass
+        
+        return product_title
+
+    def click_product_reviews(self, product_index=1):
+        self._update_progress(f"Accès aux avis du produit #{product_index}")
         time.sleep(3)
         
         max_attempts = 3
@@ -212,7 +244,6 @@ class AmazonReviewScraper:
                 
                 if len(products) > 0:
                     break
-                    
             except Exception:
                 time.sleep(2)
         
@@ -243,7 +274,6 @@ class AmazonReviewScraper:
         self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", product)
         time.sleep(1)
         
-        # Trouver et cliquer sur le lien des avis
         try:
             review_block = None
             try:
@@ -284,12 +314,10 @@ class AmazonReviewScraper:
                     continue
             
             raise NoSuchElementException("Aucun lien d'avis valide")
-            
         except NoSuchElementException:
             raise Exception(f"Aucun lien d'avis trouvé pour le produit #{product_index}")
 
     def go_back(self):
-        """Revenir à la page de résultats"""
         self._update_progress("Retour à la page de résultats")
         self.driver.back()
         time.sleep(3)
@@ -304,9 +332,7 @@ class AmazonReviewScraper:
             time.sleep(2)
 
     def extract_reviews(self, france_only=True, limit=None):
-        """Extraire les avis de la page"""
         self._update_progress("Extraction des avis en cours...")
-        
         time.sleep(3)
         
         review_blocks = self.driver.find_elements(By.CSS_SELECTOR, "div[data-hook='review']")
@@ -314,14 +340,16 @@ class AmazonReviewScraper:
             review_blocks = self.driver.find_elements(By.CSS_SELECTOR, "[data-hook='review']")
         
         if not review_blocks:
+            self._update_progress("Aucun bloc d'avis trouvé sur la page")
             return []
+        
+        self._update_progress(f"{len(review_blocks)} avis détectés sur la page")
         
         reviews = []
         skipped = 0
         
         for review_block in review_blocks:
             try:
-                # Profil
                 profile_name = "Anonyme"
                 try:
                     profile_element = review_block.find_element(By.CSS_SELECTOR, "span.a-profile-name")
@@ -333,7 +361,6 @@ class AmazonReviewScraper:
                     except:
                         pass
                 
-                # Date
                 date_element = review_block.find_element(By.CSS_SELECTOR, "span[data-hook='review-date']")
                 date_full = date_element.text
                 
@@ -344,7 +371,6 @@ class AmazonReviewScraper:
                 date_clean = re.search(r"le\s+(.+)$", date_full)
                 date_clean = date_clean.group(1) if date_clean else date_full
                 
-                # Étoiles
                 star_element = None
                 star_text = ""
                 star_value = None
@@ -372,7 +398,6 @@ class AmazonReviewScraper:
                     except:
                         pass
                 
-                # Titre de l'avis
                 review_title = ""
                 try:
                     title_element = review_block.find_element(By.CSS_SELECTOR, "a[data-hook='review-title']")
@@ -386,7 +411,6 @@ class AmazonReviewScraper:
                     except:
                         pass
                 
-                # Contenu
                 content_element = review_block.find_element(By.CSS_SELECTOR, "span[data-hook='review-body']")
                 content = content_element.text.strip()
                 
@@ -402,22 +426,92 @@ class AmazonReviewScraper:
                 
                 if limit and len(reviews) >= limit:
                     break
-                    
             except Exception:
                 continue
         
         self._update_progress(f"{len(reviews)} avis extraits")
         return reviews
 
-    def scrape_multiple_products(self, query, nb_products, france_only=True, limit_per_product=None):
+    def scrape_single_product_by_url(self, product_url, france_only=True, limit=None):
         """
-        Fonction principale - Scrape plusieurs produits
+        MODE URL: Scrape un seul produit à partir de son URL Amazon
+        Extrait les avis DIRECTEMENT depuis la page produit (section "Commentaires")
         
         Args:
-            query: ce qu'on cherche
-            nb_products: nombre de produits à scraper
-            france_only: ne garder que les avis français
-            limit_per_product: nombre max d'avis par produit
+            product_url: URL du produit (ex: https://www.amazon.fr/dp/B0F1FSGNLT)
+            france_only: Filtrer les avis français
+            limit: Nombre max d'avis
+        
+        Returns:
+            dict: Données du produit avec ses avis
+        """
+        try:
+            # Ouvrir directement l'URL du produit
+            self._update_progress(f"Accès au produit: {product_url}")
+            self.driver.get(product_url)
+            
+            # Accepter les cookies si présents
+            self.accept_cookies_if_present()
+            time.sleep(3)
+            
+            # Extraire le titre
+            product_title = self.extract_product_title()
+            self._update_progress(f"Produit: {product_title[:50]}...")
+            
+            # Extraire la marque
+            brand = self.extract_brand()
+            
+            # Scroller progressivement pour charger la section des avis
+            self._update_progress("Chargement de la section des avis...")
+            
+            # Scroll en plusieurs étapes pour bien charger le contenu
+            for i in range(3):
+                scroll_position = (i + 1) * (self.driver.execute_script("return document.body.scrollHeight") // 3)
+                self.driver.execute_script(f"window.scrollTo(0, {scroll_position});")
+                time.sleep(1)
+            
+            # Scroll final vers le bas
+            self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)
+            
+            # Extraire les avis directement depuis la page produit
+            reviews = self.extract_reviews(france_only=france_only, limit=limit)
+            
+            # Message si peu d'avis
+            if reviews and len(reviews) < 5:
+                self._update_progress(f"Seulement {len(reviews)} avis visibles sur la page produit")
+            elif not reviews or len(reviews) == 0:
+                self._update_progress("Aucun avis trouvé sur cette page")
+            
+            result = {
+                "type": "single_product",
+                "titre": product_title,
+                "marque": brand,
+                "url": product_url,
+                "date_extraction": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "filtre_france": france_only,
+                "nb_avis_extraits": len(reviews) if reviews else 0,
+                "avis": reviews if reviews else []
+            }
+            
+            self._update_progress(f"✅ Terminé: {len(reviews) if reviews else 0} avis extraits de la page produit")
+            return result
+            
+        finally:
+            self.driver.quit()
+
+    def scrape_multiple_products(self, query, nb_products, france_only=True, limit_per_product=None):
+        """
+        MODE RECHERCHE: Scrape plusieurs produits via une recherche
+        
+        Args:
+            query: Terme de recherche
+            nb_products: Nombre de produits à scraper
+            france_only: Filtrer les avis français
+            limit_per_product: Nombre max d'avis par produit
+        
+        Returns:
+            dict: Données de tous les produits avec leurs avis
         """
         try:
             self.open_amazon()
@@ -476,7 +570,6 @@ class AmazonReviewScraper:
                                 pass
                         i += 1
                         continue
-                    
                 except Exception:
                     i += 1
                     continue
@@ -484,7 +577,8 @@ class AmazonReviewScraper:
             total_reviews = sum(p["nb_avis_extraits"] for p in all_products_data)
             
             result = {
-                "type": query,
+                "type": "multiple_products",
+                "query": query,
                 "date_extraction": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                 "filtre_france": france_only,
                 "nb_produits_demandes": nb_products,
