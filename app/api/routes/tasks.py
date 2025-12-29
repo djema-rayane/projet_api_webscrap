@@ -28,18 +28,3 @@ async def delete_task(task_id: str):
     if task_manager.delete_task(task_id):
         return {"message": f"Tâche {task_id} supprimée"}
     raise HTTPException(status_code=500, detail="Erreur")
-
-@router.get("/{task_id}/download")
-async def download_results(task_id: str):
-    task = task_manager.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Tâche introuvable")
-    if task["status"] != "completed":
-        raise HTTPException(status_code=400, detail="Tâche non terminée")
-    if not task["result_file"] or not os.path.exists(task["result_file"]):
-        raise HTTPException(status_code=404, detail="Fichier introuvable")
-    return FileResponse(
-        path=task["result_file"],
-        filename=f"amazon_reviews_{task_id}.json",
-        media_type="application/json"
-    )

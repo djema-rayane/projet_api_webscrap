@@ -1,0 +1,46 @@
+{
+  "type": "aspirateur",
+  "date_extraction": "2025-12-29 21:08:12",
+  "filtre_france": true,
+  "nb_produits_demandes": 2,
+  "nb_produits_scrapes": 2,
+  "total_avis_extraits": 2,
+  "produits": [
+    {
+      "produit_numero": 1,
+      "titre": "Rowenta Compact Power Aspirateur avec sac, Moteur basse consommation de 900 W max, Compact, Haute filtration, Capacité 3 L RO3969EA, Aubergine",
+      "marque": "Rowenta Compact Apirapolvere Tra%C3%Aeneaux Aubergine",
+      "url": "https://www.amazon.fr/Rowenta-Compact-apirapolvere-tra%C3%AEneaux-aubergine/dp/B06XC58J3P/ref=sr_1_1?__mk_fr_FR=%C3%85M%C3%85%C5%BD%C3%95%C3%91&dib=eyJ2IjoiMSJ9.fiQ6qIJbvPXGW6Sk8z9hNW4-hqLGMaANdKLgMhHNK1rTDxPY-vr1BnrrImGxO_TDmzv1-FuFrMFsRuh2nh1HO5EvxiOoTpA4exoLnJ6d6aogGWp3V90XFjw4aBWLnO_TBUdnLYJiQma1Pkkmhwi8x_8yuCGB1wpDOx9CQOahtaMcE1qkN7s3DpPv3lkQm2uUa9EVVBK88z23ewcI5zC81pgwnHC19L86JxEwD8H2z0F62XmUOFiYLmeLz-chbLdrHjXkw9ZJmw_rWvBmKcVWt3aoo1qIwzGtRqlgIas2eaE.2fyC1EvdYrLZk1oF2sNUEpBUgQN0LRFhyOT1LDMzlpM&dib_tag=se&keywords=aspirateur&qid=1767038861&sr=8-1&th=1",
+      "nb_avis_extraits": 1,
+      "avis": [
+        {
+          "numero": 1,
+          "profil": "Leonardo92000",
+          "titre_review": "Compact et léger mais efficace",
+          "etoiles": "5,0 sur 5 étoiles",
+          "etoiles_valeur": 5.0,
+          "date": "22 décembre 2025",
+          "contenu": "Très puissant, pratique et léger. Bruit raisonnable. Câble de bonne longueur. Compact. C’est ce que je cherchais. Grâce à son prix léger, j’ai pu l’ acheter en complément d’un excellent Miele. Mais trop lourd pour être monté et redescendu des étages. Celui-là reste au rez-de-chaussée."
+        }
+      ]
+    },
+    {
+      "produit_numero": 2,
+      "titre": "Amazon Basics Aspirateur Traineau sans Sac 1.3L Compact Ultra-Léger avec Brosse Triple Action, Filtro HEPA, 850W, pour Tapis et Sols Durs, Gris",
+      "marque": "Amazon Basics Canister 15K0F Eu Aspirateur",
+      "url": "https://www.amazon.fr/Amazon-Basics-Canister-15K0F-EU-Aspirateur/dp/B0D6V8QD51/ref=sr_1_2?__mk_fr_FR=%C3%85M%C3%85%C5%BD%C3%95%C3%91&dib=eyJ2IjoiMSJ9.fiQ6qIJbvPXGW6Sk8z9hNW4-hqLGMaANdKLgMhHNK1rTDxPY-vr1BnrrImGxO_TDmzv1-FuFrMFsRuh2nh1HO5EvxiOoTpA4exoLnJ6d6aogGWp3V90XFjw4aBWLnO_TBUdnLYJiQma1Pkkmhwi8x_8yuCGB1wpDOx9CQOahtaMcE1qkN7s3DpPv3lkQm2uUa9EVVBK88z23ewcI5zC81pgwnHC19L86JxEwD8H2z0F62XmUOFiYLmeLz-chbLdrHjXkw9ZJmw_rWvBmKcVWt3aoo1qIwzGtRqlgIas2eaE.2fyC1EvdYrLZk1oF2sNUEpBUgQN0LRFhyOT1LDMzlpM&dib_tag=se&keywords=aspirateur&qid=1767038861&sr=8-2&th=1",
+      "nb_avis_extraits": 1,
+      "avis": [
+        {
+          "numero": 1,
+          "profil": "jan",
+          "titre_review": "Surprisingly great little vacuum!",
+          "etoiles": "5,0 sur 5 étoiles",
+          "etoiles_valeur": 5.0,
+          "date": "23 novembre 2025",
+          "contenu": "I’ve been using this Amazon Basics 700W model for a few weeks and I’m really happy with it. It’s compact, lightweight, and super easy to manoeuvre around furniture. The suction is strong enough for both my tiled floors and rugs, and the 2L dust container is simple to empty and clean. Overall, it’s perfect for quick daily cleaning and doesn’t take up much space. Highly recommended for anyone looking for a no-fuss, efficient vacuum at a good price."
+        }
+      ]
+    }
+  ]
+}
