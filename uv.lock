@@ -975,6 +975,7 @@ dependencies = [
     { name = "selenium" },
     { name = "torch" },
     { name = "transformers" },
+    { name = "undetected-chromedriver" },
     { name = "uvicorn", extra = ["standard"] },
     { name = "webdriver-manager" },
 ]
@@ -1006,6 +1007,7 @@ requires-dist = [
     { name = "selenium", specifier = ">=4.39.0" },
     { name = "torch", specifier = ">=2.9.1" },
     { name = "transformers", specifier = ">=4.57.3" },
+    { name = "undetected-chromedriver", specifier = ">=3.5.5" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.40.0" },
     { name = "webdriver-manager", specifier = ">=4.0.2" },
 ]
@@ -1655,6 +1657,17 @@ sdist = { url = "https://files.pythonhosted.org/packages/5e/a7/c202b344c5ca7daf3
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c7/b0/003792df09decd6849a5e39c28b513c06e84436a54440380862b5aeff25d/tzdata-2025.3-py2.py3-none-any.whl", hash = "sha256:06a47e5700f3081aab02b2e513160914ff0694bce9947d6b76ebd6bf57cfc5d1", size = 348521, upload-time = "2025-12-13T17:45:33.889Z" },
 ]
+
+[[package]]
+name = "undetected-chromedriver"
+version = "3.5.5"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "requests" },
+    { name = "selenium" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1f/98/7ab46625ce2317756e4e857fe6ac24b6378c3e8f477da26c95226ed8ccb7/undetected-chromedriver-3.5.5.tar.gz", hash = "sha256:9f945e1435005247abe17de316bcfda85b284a4177fd5f25167c78ced33b65ec", size = 65409, upload-time = "2024-02-17T17:18:36.855Z" }
 
 [[package]]
 name = "urllib3"

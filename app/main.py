@@ -1,8 +1,7 @@
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.api.routes import scraping, tasks, health
+from app.api.routes import scraping, tasks, health, analysis
 
 # Créer l'application
 app = FastAPI(
@@ -24,4 +23,4 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(scraping.router)
 app.include_router(tasks.router)
-
+app.include_router(analysis.router)
