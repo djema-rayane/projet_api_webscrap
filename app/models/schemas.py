@@ -1,8 +1,5 @@
-# app/models/schemas.py
-
 from enum import Enum
 from typing import Dict, Optional
-
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -14,80 +11,130 @@ class ScrapeMode(str, Enum):
     SEARCH = "search"
     URL = "url"
     URL_AUTH = "url_auth"
+    TRUSTPILOT = "trustpilot"
+    YELP = "yelp"
 
 
 class ScrapeRequest(BaseModel):
     """
     Requête de scraping
-    - search : recherche multi-produits
-    - url : un produit via URL
-    - url_auth : un produit via URL + login (username/password uniquement)
+    - search      : recherche multi-produits Amazon
+    - url         : un produit Amazon via URL
+    - url_auth    : un produit Amazon via URL + cookies/login
+    - trustpilot  : avis Trustpilot
+    - yelp        : avis Yelp
     """
 
     mode: ScrapeMode = Field(
         default=ScrapeMode.SEARCH,
-        description="Mode: 'search', 'url', 'url_auth'"
+        description="Mode de scraping"
     )
 
-    # MODE SEARCH
+    # =====================
+    # AMAZON - SEARCH
+    # =====================
     query: Optional[str] = Field(
         default=None,
-        description="[MODE SEARCH] Terme de recherche (ex: 'écran pc')"
+        description="[SEARCH] Terme de recherche Amazon"
     )
     nb_products: Optional[int] = Field(
         default=10,
         ge=1,
         le=100,
-        description="[MODE SEARCH] Nombre de produits à scraper"
+        description="[SEARCH] Nombre de produits à scraper"
     )
 
-    # MODE URL / URL_AUTH
+    # =====================
+    # AMAZON - URL / URL_AUTH
+    # =====================
     product_url: Optional[str] = Field(
         default=None,
-        description="[MODE URL/URL_AUTH] URL du produit Amazon"
+        description="[URL / URL_AUTH] URL du produit Amazon"
     )
 
-    # MODE URL_AUTH (login obligatoire)
     username: Optional[str] = Field(
         default=None,
-        description="[MODE URL_AUTH] Identifiant de connexion"
+        description="[URL_AUTH] Email Amazon"
     )
     password: Optional[str] = Field(
         default=None,
-        description="[MODE URL_AUTH] Mot de passe"
+        description="[URL_AUTH] Mot de passe Amazon"
     )
     cookies_only: bool = Field(
-    default=False,
-    description="[MODE URL_AUTH] Si True: utilise uniquement les cookies (pas de login manuel, même si username/password sont fournis)"
+        default=False,
+        description="[URL_AUTH] Si true, utilise uniquement les cookies (pas de login manuel)"
     )
-    # Communs
-    france_only: bool = Field(default=True, description="Filtrer uniquement les avis français")
-    limit_per_product: Optional[int] = Field(default=None, ge=1, description="Limite d'avis par produit (None = tous)")
-    headless: bool = Field(default=True, description="Mode headless")
 
+    france_only: bool = Field(
+        default=True,
+        description="Filtrer uniquement les avis français"
+    )
+    limit_per_product: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Limite d'avis par produit (None = tous)"
+    )
+    headless: bool = Field(
+        default=True,
+        description="Chrome headless"
+    )
+
+    # =====================
+    # TRUSTPILOT
+    # =====================
+    trustpilot_domain: Optional[str] = Field(
+        default=None,
+        description="[TRUSTPILOT] Domaine ex: carhartt-wip.com"
+    )
+    trustpilot_lang: Optional[str] = Field(
+        default="fr",
+        description="[TRUSTPILOT] Langue"
+    )
+
+    # =====================
+    # YELP / TRUSTPILOT
+    # =====================
+    yelp_business_url: Optional[str] = Field(
+        default=None,
+        description="[YELP] URL Yelp business"
+    )
+    max_pages: Optional[int] = Field(
+        default=1,
+        ge=1,
+        le=200,
+        description="[TP / YELP] Nombre de pages"
+    )
+
+    # =====================
+    # VALIDATION
+    # =====================
     @model_validator(mode="after")
     def validate_by_mode(self):
-        if self.mode == ScrapeMode.SEARCH:
-            if not self.query:
-                raise ValueError("Le paramètre 'query' est requis en mode SEARCH")
+        if self.mode == ScrapeMode.SEARCH and not self.query:
+            raise ValueError("query requis en mode SEARCH")
 
-        if self.mode == ScrapeMode.URL:
-            if not self.product_url:
-                raise ValueError("Le paramètre 'product_url' est requis en mode URL")
+        if self.mode == ScrapeMode.URL and not self.product_url:
+            raise ValueError("product_url requis en mode URL")
 
         if self.mode == ScrapeMode.URL_AUTH:
             if not self.product_url:
-                raise ValueError("Le paramètre 'product_url' est requis en mode URL_AUTH")
-
-            # Si cookies_only=True, username/password deviennent optionnels
+                raise ValueError("product_url requis en mode URL_AUTH")
             if not self.cookies_only and not (self.username and self.password):
-                raise ValueError("En mode URL_AUTH, fournissez 'username' et 'password' (ou activez cookies_only=True)")
+                raise ValueError(
+                    "URL_AUTH: fournissez username/password ou activez cookies_only"
+                )
 
+        if self.mode == ScrapeMode.TRUSTPILOT and not self.trustpilot_domain:
+            raise ValueError("trustpilot_domain requis")
+
+        if self.mode == ScrapeMode.YELP and not self.yelp_business_url:
+            raise ValueError("yelp_business_url requis")
 
         if self.product_url and not self.product_url.startswith("http"):
             raise ValueError("L'URL doit commencer par http:// ou https://")
 
         return self
+
 
     class Config:
         json_schema_extra = {

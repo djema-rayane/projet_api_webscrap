@@ -41,6 +41,39 @@ def limit_sentences(text: str, max_sentences: int = 5) -> str:
 
     return " ".join(sentences[:max_sentences]).strip()
 
+def detect_lang_fr_en(text: str) -> str:
+    """
+    Détection simple FR/EN (sans lib externe).
+    Retourne "fr" par défaut si incertain.
+    """
+    t = (text or "").lower()
+
+    # indices FR
+    fr_markers = [
+        " je ", " vous ", " votre ", " produit ", " commande ", " livraison ", " rembours",
+        " service ", " merci ", " très ", " qualité ", " problème ", " satisfait", " reçu ",
+        " colis ", " sav ", " remboursement ", " conforme ", " déçu", " déçue", " achet"
+    ]
+
+    # indices EN
+    en_markers = [
+        " i ", " you ", " your ", " product ", " order ", " delivery ", " refund",
+        " customer service ", " thank", " very ", " quality ", " problem ", " satisfied",
+        " package ", " support ", " return ", " disappointing", " bought", " received"
+    ]
+
+    fr_score = sum(m in t for m in fr_markers)
+    en_score = sum(m in t for m in en_markers)
+
+    # bonus si caractères typiquement FR
+    if any(ch in t for ch in ["é", "à", "è", "ç", "ù", "â", "ê", "î", "ô", "û"]):
+        fr_score += 1
+
+    if en_score > fr_score:
+        return "en"
+    return "fr"
+
+
 
 class ReviewAnalysisAndResponsePipeline:
     """

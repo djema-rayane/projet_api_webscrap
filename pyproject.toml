@@ -19,6 +19,7 @@ dependencies = [
     "pydantic-settings>=2.1.0",
     "python-dotenv>=1.0.0",
     "undetected-chromedriver>=3.5.5",
+    "beautifulsoup4>=4.14.3",
 ]
 
 [project.optional-dependencies]
