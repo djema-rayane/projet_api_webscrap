@@ -407,7 +407,7 @@ class AmazonReviewScraper:
             self._log("VÉRIFICATION AUTHENTIFICATION AMAZON")
             self._log("=" * 60)
 
-           
+            # Bootstrap domaine obligatoire avant add_cookie
             if not getattr(self, "_session_bootstrapped", False):
                 self._log("0️ Bootstrap amazon.fr")
                 self.driver.get("https://www.amazon.fr")
@@ -1272,9 +1272,9 @@ class AmazonReviewScraper:
                 cookies_only=cookies_only
             ):
                 if cookies_only:
-                    self._log("Cookies invalides et cookies_only=True → stop")
+                    self._log("❌ Cookies invalides et cookies_only=True → stop")
                 else:
-                    self._log("Impossible de se connecter (cookies invalides + login KO ou creds manquants)")
+                    self._log("❌ Impossible de se connecter (cookies invalides + login KO ou creds manquants)")
                 return None
 
             # Accès produit
