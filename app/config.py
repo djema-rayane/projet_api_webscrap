@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 import os
+from pathlib import Path
 
 class Settings(BaseSettings):
     app_name: str = "Amazon Review Scraper API"
@@ -8,7 +9,7 @@ class Settings(BaseSettings):
     api_port: int = 8000
     
     results_dir: str = "results"
-    selenium_profile_dir: str = "~/.selenium_profiles/amazon"
+    selenium_profile_dir: str = "results/selenium_profiles/amazon"
     default_wait_seconds: int = 15
     max_products_per_request: int = 100
     
@@ -20,4 +21,5 @@ class Settings(BaseSettings):
         case_sensitive = False
 
 settings = Settings()
-os.makedirs(settings.results_dir, exist_ok=True)
+Path(settings.results_dir).mkdir(parents=True, exist_ok=True)
+Path(settings.selenium_profile_dir).mkdir(parents=True, exist_ok=True)
