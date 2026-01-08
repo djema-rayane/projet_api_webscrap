@@ -523,41 +523,33 @@ class AmazonReviewScraper:
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(1)
 
-        next_button_selectors = [
-            "a.s-pagination-next",
-            "a[aria-label='Aller à la page suivante']",
-            ".s-pagination-next",
-        ]
+        try:
+            next_button = self.driver.find_element(By.CSS_SELECTOR, "a.s-pagination-next")
 
-        for selector in next_button_selectors:
-            try:
-                next_button = self.driver.find_element(By.CSS_SELECTOR, selector)
-                classes = next_button.get_attribute("class") or ""
-                if "disabled" in classes or "s-pagination-disabled" in classes:
-                    self._update_progress("Dernière page atteinte")
-                    return False
+            classes = next_button.get_attribute("class") or ""
+            if "s-pagination-disabled" in classes:
+                self._update_progress("Dernière page atteinte")
+                return False
 
-                self.driver.execute_script(
-                    "arguments[0].scrollIntoView({block: 'center'});",
-                    next_button,
+            self.driver.execute_script(
+                "arguments[0].scrollIntoView({block: 'center'});",
+                next_button,
+            )
+            time.sleep(1)
+            next_button.click()
+
+            self.wait.until(
+                EC.presence_of_all_elements_located(
+                    (By.CSS_SELECTOR, "div[data-component-type='s-search-result']")
                 )
-                time.sleep(1)
-                next_button.click()
-                time.sleep(3)
+            )
 
-                try:
-                    self.wait.until(
-                        EC.presence_of_all_elements_located(
-                            (By.CSS_SELECTOR, "div[data-component-type='s-search-result']")
-                        )
-                    )
-                    self._update_progress("Page suivante chargée")
-                    return True
-                except TimeoutException:
-                    return False
-            except (NoSuchElementException, Exception):
-                continue
-        return False
+            self._update_progress("Page suivante chargée")
+            return True
+
+        except NoSuchElementException:
+            self._update_progress("Bouton page suivante introuvable")
+            return False
 
     # =========================================================
     # Product data extraction
