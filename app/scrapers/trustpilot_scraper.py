@@ -1,6 +1,3 @@
-# app/scrapers/trustpilot_scraper.py
-from __future__ import annotations
-
 import json
 import re
 from datetime import datetime

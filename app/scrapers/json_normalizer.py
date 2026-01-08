@@ -1,6 +1,3 @@
-# app/scrapers/json_normalizer.py
-from __future__ import annotations
-
 from datetime import datetime
 from typing import Any, Optional
 

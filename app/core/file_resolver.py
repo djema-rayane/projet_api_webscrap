@@ -1,7 +1,4 @@
-from __future__ import annotations
-
 from pathlib import Path
-
 
 def resolve_scrape_json_path(results_dir: str, scrape_task_id: str) -> str:
     """
