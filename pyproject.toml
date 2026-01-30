@@ -20,6 +20,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "undetected-chromedriver>=3.5.5",
     "beautifulsoup4>=4.14.3",
+    "sqlalchemy>=2.0.46",
 ]
 
 [project.optional-dependencies]
