@@ -231,22 +231,3 @@ class AnalysisTaskStatus(BaseModel):
     error: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
-
-
-# =========================================================
-# Reply one
-# =========================================================
-
-class ReplyOneRequest(BaseModel):
-    scrape_task_id: str = Field(..., description="ID de la tâche de scraping terminée")
-    product_index: int = Field(default=1, ge=1, description="Produit ciblé (1 si single_product)")
-    review_numero: int = Field(..., ge=1, description="Numéro de l'avis dans le JSON (champ 'numero')")
-    use_gpu: bool = True
-
-
-class ReplyOneResponse(BaseModel):
-    scrape_task_id: str
-    product_index: int
-    review_numero: int
-    sentiment: str
-    reply: str

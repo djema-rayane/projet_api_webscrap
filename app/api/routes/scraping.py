@@ -3,7 +3,7 @@ from app.models.schemas import ScrapeRequest, ScrapeResponse, ScrapeMode
 from app.core.task_manager import task_manager
 from app.core.scraper_wrapper import execute_scraping_task
 
-router = APIRouter(prefix="/scrape", tags=["Scraping"])
+router = APIRouter(prefix="/scrape", tags=["Webscraping des avis clients"])
 
 
 @router.post("", response_model=ScrapeResponse)
@@ -65,7 +65,7 @@ async def scrape(request: ScrapeRequest, background_tasks: BackgroundTasks):
       "username": "email@example.com",
       "password": "motdepasse",
       "france_only": false,
-      "limit_per_product": 200,
+      "limit_per_product": 100,
       "headless": true
     }
     ```

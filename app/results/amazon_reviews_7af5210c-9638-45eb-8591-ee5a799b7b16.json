@@ -1,0 +1,83 @@
+{
+  "type": "single_product",
+  "titre": "Samsung Galaxy Tab S10 FE, Android WiFi Tablet 10.9 Inches 128 GB, S Pen Included, IP68 Certification, Charcoal Grey, 25W Fast Mains Charger Included, FR Version",
+  "marque": "Samsung",
+  "url": "https://www.amazon.fr/Samsung-Tablette-Certification-Anthracite-Chargeur/dp/B0DXVRJWY2/ref=s9_acsd_al_ot_c2_x_0_t?_encoding=UTF8&pf_rd_m=A13V1IB3VIYZZH&pf_rd_s=merchandised-search-8&pf_rd_r=F10V2HSWYRARV8R8RPPM&pf_rd_p=982f84f2-765b-4058-8598-6dd16bd659ad&pf_rd_t=&pf_rd_i=206258861031&th=1",
+  "date_extraction": "2026-01-30 22:49:14",
+  "filtre_france": false,
+  "nb_avis_extraits": 8,
+  "avis": [
+    {
+      "numero": 1,
+      "profil": "Leonide",
+      "titre_review": "Prise de note et bidouille",
+      "etoiles": "5.0 out of 5 stars",
+      "etoiles_valeur": 5.0,
+      "date": "Reviewed in France on 27 December 2025",
+      "contenu": "Excellent pour de la prise de note manuscrite, marche également bien pour de l'émulation wii/3ds ou antérieure."
+    },
+    {
+      "numero": 2,
+      "profil": "caire",
+      "titre_review": "manque un chargeur",
+      "etoiles": "5.0 out of 5 stars",
+      "etoiles_valeur": 5.0,
+      "date": "Reviewed in France on 16 January 2026",
+      "contenu": "reçue bien emballée et rien à dire sauf qu'un chargeur devait être mis avec mais là rien, ce n'est pas très normal."
+    },
+    {
+      "numero": 3,
+      "profil": "anticlock",
+      "titre_review": "ALERTE MENSONGE",
+      "etoiles": "1.0 out of 5 stars",
+      "etoiles_valeur": 1.0,
+      "date": "Reviewed in France on 23 December 2025",
+      "contenu": "FUYEZ. J'ai choisi cette annonce parce qu'elle incluait le chargeur secteur rapide 25W en plus par rapport à d'autres vendeurs. J'ai re-re-re-vérifier 25 fois. C'est bien écrit plusieurs fois dans l'annonce (cf photos). Quelques commentaires se plaignent de n'avoir pas eu le chargeur alors que d'autres disent l'avoir eu. Je me suis fait un avis par moi-même: MENSONGE ! PAS DE CHARGEUR. Si j'avais su, je serai passé par le site samsung directement. Maintenant je doute même de la tablette en me disant que c'est peut-être du reconditionné. Après tout pourquoi s'arrêter au chargeur dans le mensonge. Je n'arrive pas à avoir de service client, impossible d'expliquer ce qui ne va pas à qq1; je veux juste qu'on m'envoie le chargeur et pas renvoyer la tablette. ça doit être possible non?"
+    },
+    {
+      "numero": 4,
+      "profil": "Matthieu",
+      "titre_review": "Manque Chargeur Secteur Rapide 25W",
+      "etoiles": "4.0 out of 5 stars",
+      "etoiles_valeur": 4.0,
+      "date": "Reviewed in France on 25 November 2025",
+      "contenu": "Tablette au top par contre il manque le Chargeur Secteur Rapide 25W affiché comme Inclus dans le package."
+    },
+    {
+      "numero": 5,
+      "profil": "LELEU patrick",
+      "titre_review": "Tablette performante et raisonnable en prix",
+      "etoiles": "5.0 out of 5 stars",
+      "etoiles_valeur": 5.0,
+      "date": "Reviewed in France on 12 October 2025",
+      "contenu": "Acheté pour la maison et pour les vacances, cette tablette sous ONE UI 8 et Android 16, est performante et réactive, mème pour le jeu. La finition est conforme au standard Samsung et en bleu elle est très belle. Si on a un téléphone de la mème marque il est très facile de transférer du téléphone vers la tablette pour ne pas avoir à tout installer. Un bon achat dont je suis content."
+    },
+    {
+      "numero": 6,
+      "profil": "Lucile Schmitt",
+      "titre_review": "Parfait, efficace et Qualité irréprochable",
+      "etoiles": "5.0 out of 5 stars",
+      "etoiles_valeur": 5.0,
+      "date": "Reviewed in France on 31 December 2025",
+      "contenu": "Nous avions besoin d'une tablette pour le travail j'avais déjà commandé une galaxy Tab il y a quelques années et j'ai longuement hésité mais je ne peux que recommander. Interface rapide écran de qualité pas de bug vraiment de belles finitions !! Un beau bijou 💎"
+    },
+    {
+      "numero": 7,
+      "profil": "Jenden",
+      "titre_review": "Plutôt satisfait",
+      "etoiles": "5.0 out of 5 stars",
+      "etoiles_valeur": 5.0,
+      "date": "Reviewed in France on 20 January 2026",
+      "contenu": "Tablette qui correspond aux attentes. Simples d’utilisation et performante. À voir dans le temps"
+    },
+    {
+      "numero": 8,
+      "profil": "Caleb Adewole",
+      "titre_review": "No charger",
+      "etoiles": "2.0 out of 5 stars",
+      "etoiles_valeur": 2.0,
+      "date": "Reviewed in France on 4 December 2025",
+      "contenu": "The package didn't include an adapter as I expected. Only the tab, the usb charger, a pin, and the stylus pen."
+    }
+  ]
+}

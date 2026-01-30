@@ -4,27 +4,13 @@ from app.models.schemas import TaskStatus, TasksList
 from app.core.task_manager import task_manager
 import os
 
-router = APIRouter(prefix="/tasks", tags=["Tâches"])
+router = APIRouter(prefix="/tasks", tags=["Historique des tâches"])
 
 @router.get("", response_model=TasksList)
 async def list_all_tasks():
     tasks = task_manager.get_all_tasks()
     return TasksList(total=len(tasks), tasks=tasks)
 
-@router.get("/{task_id}", response_model=TaskStatus)
-async def get_task_status(task_id: str):
-    task = task_manager.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Tâche introuvable")
-    return TaskStatus(**task)
 
-@router.delete("/{task_id}")
-async def delete_task(task_id: str):
-    task = task_manager.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Tâche introuvable")
-    if task["status"] == "running":
-        raise HTTPException(status_code=400, detail="Tâche en cours")
-    if task_manager.delete_task(task_id):
-        return {"message": f"Tâche {task_id} supprimée"}
-    raise HTTPException(status_code=500, detail="Erreur")
+
+

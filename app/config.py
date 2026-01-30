@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 
 class Settings(BaseSettings):
-    app_name: str = "Amazon Review Scraper API"
+    app_name: str = "Review Scraper API"
     app_version: str = "2.0.0"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
