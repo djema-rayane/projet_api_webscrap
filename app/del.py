@@ -1,4 +1,4 @@
-from app.database import Base, engine, drop_all_tables, init_database
+from app.database import drop_all_tables, init_database
 
 print("⚠️ Suppression de toutes les tables...")
 drop_all_tables()

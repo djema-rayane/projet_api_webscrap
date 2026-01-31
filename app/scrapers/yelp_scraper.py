@@ -1,12 +1,8 @@
 import re
 import time
 from datetime import datetime
-from pathlib import Path
 from typing import Optional, List, Dict
-
 from bs4 import BeautifulSoup
-import pandas as pd
-
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
@@ -71,8 +67,6 @@ def scrape_yelp_json(
     Scraping Yelp -> JSON compatible modèle
     """
     driver = _init_driver(headless=headless)
-    results_path = Path(results_dir).resolve() if results_dir else None
-
     avis: List[Dict] = []
     numero = 1
 

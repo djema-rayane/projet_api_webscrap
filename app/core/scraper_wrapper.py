@@ -1,7 +1,7 @@
+from typing import Optional, Dict, Any
 from app.core.task_manager import task_manager
 from app.config import settings
 from pathlib import Path
-from datetime import datetime
 
 from app.database import SessionLocal
 from app.crud import (
@@ -11,20 +11,20 @@ from app.crud import (
 )
 
 
-def execute_scraping_task(task_id: str, request_data: dict):
+def execute_scraping_task(task_id: str, request_data: Dict[str, Any]) -> None:
     """
     Exécute une tâche de scraping avec insertion EN TEMPS RÉEL.
     Le scraper gère l'insertion directe en BDD via set_db_session().
     """
-    scraper = None
+    from app.scrapers.amazon_scraper import AmazonReviewScraper
+    
+    scraper: Optional[AmazonReviewScraper] = None
     db = None
     session_scraping = None
     
     try:
         # Initialiser la session BDD
         db = SessionLocal()
-        
-        from app.scrapers.amazon_scraper import AmazonReviewScraper
 
         task_manager.update_status(task_id, "running")
 
@@ -60,7 +60,7 @@ def execute_scraping_task(task_id: str, request_data: dict):
         # Créer la session de scraping dans la BDD avec task_id
         session_scraping = creer_session_scraping(
             db=db,
-            task_id=task_id,  # AJOUT : task_id comme identifiant
+            task_id=task_id,
             type_scraping=mode,
             source=source,
             query=request_data.get("query") if mode == "search" else None,
@@ -96,6 +96,8 @@ def execute_scraping_task(task_id: str, request_data: dict):
         # Dispatch by mode
         # =====================================================
         if mode == "url":
+            assert scraper is not None, "Scraper non initialisé pour mode 'url'"
+            
             product_url = request_data["product_url"]
             france_only = request_data.get("france_only", True)
             limit = request_data.get("limit_per_product")
@@ -109,7 +111,7 @@ def execute_scraping_task(task_id: str, request_data: dict):
             # Créer le produit et l'assigner au scraper
             scraper.produit_actuel = creer_produit(
                 db=db,
-                session_id=session_scraping.id,
+                session_id=int(session_scraping.id),  # Cast explicite
                 source=source,
                 titre=product_title,
                 url=product_url,
@@ -132,6 +134,8 @@ def execute_scraping_task(task_id: str, request_data: dict):
             scraper.extract_reviews(france_only=france_only, limit=limit, insert_db=True)
 
         elif mode == "url_auth":
+            assert scraper is not None, "Scraper non initialisé pour mode 'url_auth'"
+            
             product_url = request_data["product_url"]
             username = request_data.get("username")
             password = request_data.get("password")
@@ -154,7 +158,7 @@ def execute_scraping_task(task_id: str, request_data: dict):
             # Créer le produit et l'assigner au scraper
             scraper.produit_actuel = creer_produit(
                 db=db,
-                session_id=session_scraping.id,
+                session_id=int(session_scraping.id),  # Cast explicite
                 source=source,
                 titre=product_title,
                 url=product_url,
@@ -163,12 +167,12 @@ def execute_scraping_task(task_id: str, request_data: dict):
             
             task_manager.update_progress(
                 task_id,
-                f"📦 Produit : {product_title[:50]}..."
+                f"Produit : {product_title[:50]}..."
             )
             
             # Aller sur la page complète des avis
             if not scraper.click_voir_plus_commentaires():
-                task_manager.update_progress(task_id, "⚠️ Impossible d'accéder à la page des avis")
+                task_manager.update_progress(task_id, "Impossible d'accéder à la page des avis")
             else:
                 scraper.click_traduire_commentaires()
                 
@@ -179,7 +183,7 @@ def execute_scraping_task(task_id: str, request_data: dict):
                 while scraper.avis_count < limit and page <= max_pages:
                     task_manager.update_progress(
                         task_id,
-                        f"📄 Page {page} - {scraper.avis_count} avis insérés"
+                        f"Page {page} - {scraper.avis_count} avis insérés"
                     )
                     
                     # L'insertion se fait automatiquement
@@ -209,7 +213,7 @@ def execute_scraping_task(task_id: str, request_data: dict):
                 limit=request_data.get("limit_per_product") or 200,
             )
             
-            _insert_single_product_to_db(db, session_scraping.id, source, result)
+            _insert_single_product_to_db(db, int(session_scraping.id), source, result)
 
         elif mode == "yelp":
             from app.scrapers.yelp_scraper import scrape_yelp_json
@@ -223,10 +227,11 @@ def execute_scraping_task(task_id: str, request_data: dict):
                 results_dir=settings.results_dir,
             )
             
-            _insert_single_product_to_db(db, session_scraping.id, source, result)
+            _insert_single_product_to_db(db, int(session_scraping.id), source, result)
 
         else:  # mode == "search"
-            # Pour le mode search, utiliser l'ancienne méthode pour l'instant
+            assert scraper is not None, "Scraper non initialisé pour mode 'search'"
+            
             result = scraper.scrape_multiple_products(
                 query=request_data["query"],
                 nb_products=request_data["nb_products"],
@@ -234,19 +239,19 @@ def execute_scraping_task(task_id: str, request_data: dict):
                 limit_per_product=request_data.get("limit_per_product"),
             )
             
-            _insert_multiple_products_to_db(db, session_scraping.id, source, result)
+            _insert_multiple_products_to_db(db, int(session_scraping.id), source, result)
 
         # =====================================================
         # Finaliser la session dans la BDD (via task_id)
         # =====================================================
         nb_produits = 1 if mode in ("url", "url_auth", "trustpilot", "yelp") else request_data.get("nb_products", 1)
         
-        #Utiliser scraper.avis_count pour les modes Amazon
+        # Utiliser scraper.avis_count pour les modes Amazon
         avis_count = scraper.avis_count if scraper else 0
         
         finaliser_session_scraping(
             db=db,
-            session_id=session_scraping.id,  # On garde session_id en interne pour l'ORM
+            session_id=int(session_scraping.id), 
             nb_avis_extraits=avis_count,
             nb_produits_scrapes=nb_produits,
             statut="completed",
@@ -267,7 +272,7 @@ def execute_scraping_task(task_id: str, request_data: dict):
             avis_count = scraper.avis_count if scraper else 0
             finaliser_session_scraping(
                 db=db,
-                session_id=session_scraping.id,
+                session_id=int(session_scraping.id),
                 nb_avis_extraits=avis_count,
                 statut="failed",
                 erreur=str(e),
@@ -291,7 +296,7 @@ def execute_scraping_task(task_id: str, request_data: dict):
 # Fonctions helper (pour Trustpilot/Yelp/Search)
 # =====================================================
 
-def _insert_single_product_to_db(db, session_id: int, source: str, result: dict):
+def _insert_single_product_to_db(db, session_id: int, source: str, result: Dict[str, Any]) -> None:
     """Insère un produit unique et ses avis dans la BDD."""
     from app.crud import creer_produit, inserer_avis_batch
     
@@ -308,14 +313,14 @@ def _insert_single_product_to_db(db, session_id: int, source: str, result: dict)
     if avis_liste:
         inserer_avis_batch(
             db=db,
-            session_id=session_id,
-            produit_id=produit.id,
+            session_id=session_id,  # Déjà un int
+            produit_id=int(produit.id),
             source=source,
             avis_liste=avis_liste,
         )
 
 
-def _insert_multiple_products_to_db(db, session_id: int, source: str, result: dict):
+def _insert_multiple_products_to_db(db, session_id: int, source: str, result: Dict[str, Any]) -> None:
     """Insère plusieurs produits et leurs avis dans la BDD."""
     from app.crud import creer_produit, inserer_avis_batch
     
@@ -336,8 +341,8 @@ def _insert_multiple_products_to_db(db, session_id: int, source: str, result: di
         if avis_liste:
             inserer_avis_batch(
                 db=db,
-                session_id=session_id,
-                produit_id=produit.id,
+                session_id=session_id,  # Déjà un int
+                produit_id=int(produit.id),
                 source=source,
                 avis_liste=avis_liste,
             )

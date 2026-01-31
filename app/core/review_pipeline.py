@@ -1,15 +1,22 @@
-import csv
-import json
 import re
 import threading
-from typing import Dict, Tuple
+from typing import Any, Dict, List, Tuple
 
-import pandas as pd
+import pandas as pd 
 import torch
-from transformers import AutoModelForCausalLM, AutoModelForSequenceClassification, AutoTokenizer
+from transformers import (
+    AutoModelForCausalLM,
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+)
+from transformers.modeling_utils import PreTrainedModel
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+
+# Ignorer mypy pour langdetect (pas de stubs disponibles)
+from langdetect import detect, LangDetectException  # type: ignore[import-untyped]
 
 
-def _sanitize_for_csv(value):
+def _sanitize_for_csv(value: Any) -> Any:
     """
     Rend les champs texte "CSV-friendly" (évite l'effet multi-lignes dans les éditeurs).
     - remplace retours ligne par \\n
@@ -41,44 +48,32 @@ def limit_sentences(text: str, max_sentences: int = 5) -> str:
 
     return " ".join(sentences[:max_sentences]).strip()
 
+
 def detect_lang_fr_en(text: str) -> str:
     """
-    Détection simple FR/EN (sans lib externe).
-    Retourne "fr" par défaut si incertain.
+    Détecte la langue FR/EN avec langdetect.
+    Retourne "fr" par défaut si détection impossible.
     """
-    t = (text or "").lower()
-
-    # indices FR
-    fr_markers = [
-        " je ", " vous ", " votre ", " produit ", " commande ", " livraison ", " rembours",
-        " service ", " merci ", " très ", " qualité ", " problème ", " satisfait", " reçu ",
-        " colis ", " sav ", " remboursement ", " conforme ", " déçu", " déçue", " achet"
-    ]
-
-    # indices EN
-    en_markers = [
-        " i ", " you ", " your ", " product ", " order ", " delivery ", " refund",
-        " customer service ", " thank", " very ", " quality ", " problem ", " satisfied",
-        " package ", " support ", " return ", " disappointing", " bought", " received"
-    ]
-
-    fr_score = sum(m in t for m in fr_markers)
-    en_score = sum(m in t for m in en_markers)
-
-    # bonus si caractères typiquement FR
-    if any(ch in t for ch in ["é", "à", "è", "ç", "ù", "â", "ê", "î", "ô", "û"]):
-        fr_score += 1
-
-    if en_score > fr_score:
-        return "en"
-    return "fr"
-
+    if not text or not text.strip():
+        return "fr"
+    
+    try:
+        lang = detect(text)
+        return lang if lang in ["fr", "en"] else "fr"
+    except LangDetectException:
+        return "fr"
 
 
 class ReviewAnalysisAndResponsePipeline:
     """
     Pipeline complet: analyse de sentiment + génération de réponses automatiques
     """
+
+    sentiment_tokenizer: PreTrainedTokenizerBase
+    sentiment_model: PreTrainedModel
+    response_tokenizer: PreTrainedTokenizerBase
+    response_model: PreTrainedModel
+    device: str
 
     def __init__(
         self,
@@ -97,17 +92,17 @@ class ReviewAnalysisAndResponsePipeline:
 
         # 1) Modèle sentiment
         print(f"Chargement du modèle de sentiment: {sentiment_model}")
-        self.sentiment_tokenizer = AutoTokenizer.from_pretrained(sentiment_model)
-        self.sentiment_model = AutoModelForSequenceClassification.from_pretrained(sentiment_model)
+        self.sentiment_tokenizer = AutoTokenizer.from_pretrained(sentiment_model)  # type: ignore[assignment]
+        self.sentiment_model = AutoModelForSequenceClassification.from_pretrained(sentiment_model)  # type: ignore[assignment]
         self.sentiment_model.to(self.device)
         print("Modèle de sentiment chargé\n")
 
         # 2) Modèle génération
         print(f"Chargement du modèle de génération: {response_model}")
-        self.response_tokenizer = AutoTokenizer.from_pretrained(response_model)
+        self.response_tokenizer = AutoTokenizer.from_pretrained(response_model)  # type: ignore[assignment]
 
         if self.device == "cuda":
-            self.response_model = AutoModelForCausalLM.from_pretrained(
+            self.response_model = AutoModelForCausalLM.from_pretrained(  # type: ignore[assignment]
                 response_model,
                 torch_dtype=torch.float16,
                 device_map={"": 0},
@@ -115,7 +110,7 @@ class ReviewAnalysisAndResponsePipeline:
             )
             print("Modèle de génération chargé entièrement sur GPU:0")
         else:
-            self.response_model = AutoModelForCausalLM.from_pretrained(
+            self.response_model = AutoModelForCausalLM.from_pretrained(  # type: ignore[assignment]
                 response_model,
                 torch_dtype=torch.float32,
                 low_cpu_mem_usage=True,
@@ -129,7 +124,7 @@ class ReviewAnalysisAndResponsePipeline:
             mem_reserved = torch.cuda.memory_reserved(0) / 1024**3
             print(f"VRAM utilisée: {mem_allocated:.2f} GB / Réservée: {mem_reserved:.2f} GB\n")
 
-    def analyze_sentiment(self, text: str) -> dict:
+    def analyze_sentiment(self, text: str) -> Dict[str, Any]:
         if not isinstance(text, str) or not text.strip():
             return {"sentiment": "neutral", "confidence": 0.0, "stars_predicted": 3}
 
@@ -137,10 +132,10 @@ class ReviewAnalysisAndResponsePipeline:
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
         with torch.no_grad():
-            outputs = self.sentiment_model(**inputs)
+            outputs = self.sentiment_model(**inputs)  # type: ignore[operator]
             probs = torch.softmax(outputs.logits, dim=-1)
-            label_id = int(torch.argmax(probs, dim=-1))
-            confidence = float(probs[0][label_id])
+            label_id = int(torch.argmax(probs, dim=-1).item())
+            confidence = float(probs[0][label_id].item())
 
         stars = label_id + 1
         sentiment = "negative" if stars <= 2 else ("neutral" if stars == 3 else "positive")
@@ -151,91 +146,11 @@ class ReviewAnalysisAndResponsePipeline:
             "stars_predicted": stars,
         }
 
-    def load_and_analyze_json(self, json_file: str) -> pd.DataFrame:
-        print("=" * 70)
-        print("ÉTAPE 1: ANALYSE DES SENTIMENTS")
-        print("=" * 70 + "\n")
-
-        print(f"Chargement: {json_file}")
-
-        with open(json_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        rows = []
-
-        # Format single_product
-        if "avis" in data and "produits" not in data:
-            print("Format détecté: Single Product\n")
-            total_avis = len(data.get("avis", []))
-            print(f"Analyse de {total_avis} avis...\n")
-
-            count = 0
-            for avis in data.get("avis", []):
-                sentiment_result = self.analyze_sentiment(avis.get("contenu", ""))
-
-                rows.append(
-                    {
-                        "produit_numero": 1,
-                        "produit_titre_complet": data.get("titre", "Produit sans titre"),
-                        "brand": data.get("marque", "Marque non disponible"),
-                        "avis_numero": avis.get("numero", count + 1),
-                        "Nom": avis.get("profil", ""),
-                        "Titre de l'avis": avis.get("titre_review", ""),
-                        "etoiles_valeur": avis.get("etoiles_valeur"),
-                        "Date_str": avis.get("date", ""),
-                        "Avis": avis.get("contenu", ""),
-                        "sentiment": sentiment_result["sentiment"],
-                        "platform": "Amazon",
-                    }
-                )
-
-                count += 1
-                if count % 50 == 0 or count == total_avis:
-                    print(f"  [{count}/{total_avis}] avis analysés")
-
-        # Format multi-produits
-        elif "produits" in data:
-            print("Format détecté: Multi-Produits\n")
-            total_avis = sum(len(p.get("avis", [])) for p in data.get("produits", []))
-            print(f"Analyse de {total_avis} avis...\n")
-
-            count = 0
-            for produit in data.get("produits", []):
-                for avis in produit.get("avis", []):
-                    sentiment_result = self.analyze_sentiment(avis.get("contenu", ""))
-
-                    rows.append(
-                        {
-                            "produit_numero": produit.get("produit_numero", 0),
-                            "produit_titre_complet": produit.get("titre", ""),
-                            "brand": produit.get("marque", "Marque non disponible"),
-                            "avis_numero": avis.get("numero", 0),
-                            "Nom": avis.get("profil", ""),
-                            "Titre de l'avis": avis.get("titre_review", ""),
-                            "etoiles_valeur": avis.get("etoiles_valeur"),
-                            "Date_str": avis.get("date", ""),
-                            "Avis": avis.get("contenu", ""),
-                            "sentiment": sentiment_result["sentiment"],
-                            "platform": "Amazon",
-                        }
-                    )
-
-                    count += 1
-                    if count % 50 == 0 or count == total_avis:
-                        print(f"  [{count}/{total_avis}] avis analysés")
-
-        else:
-            print("Format JSON non reconnu!")
-            print(f"Clés disponibles: {list(data.keys())}")
-
-        print(f"\nAnalyse terminée: {len(rows)} avis\n")
-        return pd.DataFrame(rows)
-
-    def generate_response(self, row: dict, max_length: int = 280) -> str:
+    def generate_response(self, row: Dict[str, Any], max_length: int = 280) -> str:
         """
-        Génère une réponse professionnelle (sortie propre, sans recracher le prompt).
+        Génère une réponse professionnelle bilingue (FR/EN) selon la langue détectée.
         Fix: évite les réponses trop courtes type "Monsieur X," sur sentiments négatifs.
-        + Fix: limite par phrases complètes (pas de phrase coupée).
+        Fix: limite par phrases complètes (pas de phrase coupée).
         """
         nom = row.get("Nom", "") or ""
         titre_avis = row.get("Titre de l'avis", "") or ""
@@ -245,126 +160,208 @@ class ReviewAnalysisAndResponsePipeline:
         sentiment = row.get("sentiment", "neutral") or "neutral"
         etoiles = row.get("etoiles_valeur")
 
-        # Utiliser le NOM complet si dispo
-        client_name = nom.strip() if nom.strip() else "Madame, Monsieur"
+        # Détection de la langue
+        lang = detect_lang_fr_en(avis)
+        
+        # Configuration client
+        if lang == "en":
+            client_name = nom.strip() if isinstance(nom, str) and nom.strip() else "Dear Customer"
+        else:
+            client_name = nom.strip() if isinstance(nom, str) and nom.strip() else "Madame, Monsieur"
 
         if marque and marque != "Marque non disponible":
-            marque_clean = marque.lower().replace(" ", "").replace("-", "")
-            email_service = f"{marque_clean}@serviceclient.fr"
+            marque_clean = str(marque).lower().replace(" ", "").replace("-", "")
+            if lang == "en":
+                email_service = f"{marque_clean}@customerservice.com"
+            else:
+                email_service = f"{marque_clean}@serviceclient.fr"
         else:
-            email_service = "support@serviceclient.fr"
+            if lang == "en":
+                email_service = "support@customerservice.com"
+            else:
+                email_service = "support@serviceclient.fr"
 
         include_contact = sentiment != "positive"
-        etoiles_text = f" ({etoiles}/5 étoiles)" if etoiles else ""
+        etoiles_text = f" ({etoiles}/5 stars)" if etoiles and lang == "en" else (f" ({etoiles}/5 étoiles)" if etoiles else "")
 
-        prompt_lines = [
-            "Vous êtes un agent de service client professionnel.",
-            "",
-            "Objectif:",
-            "Rédiger une réponse professionnelle à un message client.",
-            "",
-            "Contraintes STRICTES:",
-            "- Ton professionnel, sobre, courtois (pas familier)",
-            "- Vouvoiement obligatoire",
-            "- Ne pas commencer par Monsieur/Madame/Bonjour/Bonsoir",
-            "- Pas d'emojis",
-            "- Pas de flatterie (ex: bravo, excellent choix, etc.)",
-            "- Pas de marketing ni de promesses",
-            "- 3 à 5 phrases maximum",
-            "- Ne pas mentionner Amazon ni le mot avis",
-            "- Ne pas recopier le message du client mot pour mot",
-            "- Répondre uniquement avec le texte final (pas de préambule)",
-            "",
-            "Contexte:",
-            f"- Nom du client: {client_name}",
-            f"- Produit: {produit}",
-            f"- Marque: {marque}",
-            f"- Sentiment: {sentiment}{etoiles_text}",
-            f"- Titre: {titre_avis}",
-            f"- Message client: {avis}",
-        ]
+        # PROMPT FRANÇAIS
+        if lang == "fr":
+            prompt_lines = [
+                "Vous êtes un agent de service client professionnel.",
+                "",
+                "Objectif:",
+                "Rédiger une réponse professionnelle à un message client.",
+                "",
+                "Contraintes STRICTES:",
+                "- Ton professionnel, sobre, courtois (pas familier)",
+                "- Vouvoiement obligatoire",
+                "- Ne pas commencer par Monsieur/Madame/Bonjour/Bonsoir",
+                "- Pas d'emojis",
+                "- Pas de flatterie (ex: bravo, excellent choix, etc.)",
+                "- Pas de marketing ni de promesses",
+                "- 3 à 5 phrases maximum",
+                "- Ne pas mentionner Amazon ni le mot avis",
+                "- Ne pas recopier le message du client mot pour mot",
+                "- Répondre uniquement avec le texte final (pas de préambule)",
+                "",
+                "Contexte:",
+                f"- Nom du client: {client_name}",
+                f"- Produit: {produit}",
+                f"- Marque: {marque}",
+                f"- Sentiment: {sentiment}{etoiles_text}",
+                f"- Titre: {titre_avis}",
+                f"- Message client: {avis}",
+            ]
 
-        if include_contact:
-            prompt_lines.append(f"- Contact SAV: {email_service}")
+            if include_contact:
+                prompt_lines.append(f"- Contact SAV: {email_service}")
 
-        prompt_lines += [
-            "",
-            "Consigne:",
-            "- Si sentiment POSITIF: remercier brièvement et confirmer la prise en compte.",
-            "- Si sentiment NEUTRE: remercier et proposer une aide si besoin.",
-            "- Si sentiment NEGATIF: s'excuser et inviter à contacter le SAV.",
-        ]
+            prompt_lines += [
+                "",
+                "Consigne:",
+                "- Si sentiment POSITIF: remercier brièvement et confirmer la prise en compte.",
+                "- Si sentiment NEUTRE: remercier et proposer une aide si besoin.",
+                "- Si sentiment NEGATIF: s'excuser et inviter à contacter le SAV.",
+            ]
 
-        if include_contact:
-            prompt_lines.append(f"- Mentionner l'email SAV exactement: {email_service}")
+            if include_contact:
+                prompt_lines.append(f"- Mentionner l'email SAV exactement: {email_service}")
+            else:
+                prompt_lines.append("- Ne pas mentionner d'email.")
+
+            prompt_lines += ["", "Réponse:"]
+
+        # PROMPT ANGLAIS
         else:
-            prompt_lines.append("- Ne pas mentionner d'email.")
+            prompt_lines = [
+                "You are a professional customer service agent.",
+                "",
+                "Objective:",
+                "Write a professional response to a customer message.",
+                "",
+                "STRICT Constraints:",
+                "- Professional, sober, courteous tone (not casual)",
+                "- Formal address (you/your)",
+                "- Do not start with Dear/Hello/Hi",
+                "- No emojis",
+                "- No flattery (ex: great choice, excellent, etc.)",
+                "- No marketing or promises",
+                "- 3 to 5 sentences maximum",
+                "- Do not mention Amazon or the word review",
+                "- Do not copy the customer's message word for word",
+                "- Respond only with the final text (no preamble)",
+                "",
+                "Context:",
+                f"- Customer name: {client_name}",
+                f"- Product: {produit}",
+                f"- Brand: {marque}",
+                f"- Sentiment: {sentiment}{etoiles_text}",
+                f"- Title: {titre_avis}",
+                f"- Customer message: {avis}",
+            ]
 
-        prompt_lines += ["", "Réponse:"]
+            if include_contact:
+                prompt_lines.append(f"- Customer service contact: {email_service}")
+
+            prompt_lines += [
+                "",
+                "Instructions:",
+                "- If sentiment POSITIVE: thank briefly and confirm acknowledgment.",
+                "- If sentiment NEUTRAL: thank and offer help if needed.",
+                "- If sentiment NEGATIVE: apologize and invite to contact customer service.",
+            ]
+
+            if include_contact:
+                prompt_lines.append(f"- Mention customer service email exactly: {email_service}")
+            else:
+                prompt_lines.append("- Do not mention any email.")
+
+            prompt_lines += ["", "Response:"]
+
         prompt = "\n".join(prompt_lines)
 
+        # Génération
         inputs = self.response_tokenizer(prompt, return_tensors="pt")
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
 
-        outputs = self.response_model.generate(
+        outputs = self.response_model.generate(  # type: ignore[operator]
             **inputs,
             max_new_tokens=max_length,
             temperature=0.3,
             top_p=0.9,
             do_sample=True,
             repetition_penalty=1.1,
-            pad_token_id=self.response_tokenizer.eos_token_id,
-            eos_token_id=self.response_tokenizer.eos_token_id,
+            pad_token_id=getattr(self.response_tokenizer, "eos_token_id", None),
+            eos_token_id=getattr(self.response_tokenizer, "eos_token_id", None),
         )
 
         raw = self.response_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
 
-        # Garder uniquement après "Réponse:"
-        response = raw.split("Réponse:", 1)[-1].strip() if "Réponse:" in raw else raw
+        # Extraction réponse
+        if lang == "fr":
+            response = raw.split("Réponse:", 1)[-1].strip() if "Réponse:" in raw else raw
+        else:
+            response = raw.split("Response:", 1)[-1].strip() if "Response:" in raw else raw
+        
         response = response.strip().strip('"').strip("'")
-
-        # Normaliser: enlever lignes vides
         response = " ".join(line.strip() for line in response.splitlines() if line.strip()).strip()
 
-        def _looks_like_only_salutation(text: str) -> bool:
+        # Détection salutation seule (bilingue)
+        def _looks_like_only_salutation(text: str, language: str) -> bool:
             t = text.strip()
             if len(t) >= 60:
                 return False
-            return bool(re.match(r"^(Monsieur|Madame|Bonjour|Bonsoir)\b", t, flags=re.IGNORECASE))
+            if language == "fr":
+                return bool(re.match(r"^(Monsieur|Madame|Bonjour|Bonsoir)\b", t, flags=re.IGNORECASE))
+            else:
+                return bool(re.match(r"^(Dear|Hello|Hi|Sir|Madam)\b", t, flags=re.IGNORECASE))
 
-        # Retry 1 fois si négatif et réponse trop courte / salutation seule
-        if sentiment == "negative" and (len(response) < 80 or _looks_like_only_salutation(response)):
-            prompt_retry = (
-                prompt
-                + "\n\nIMPORTANT: Répondez en 3 à 5 phrases complètes. "
-                "Incluez des excuses, une solution proposée, et le contact SAV si demandé. "
-                "Ne répondez pas avec une simple formule de politesse."
-            )
+        # Retry si réponse trop courte sur sentiment négatif
+        if sentiment == "negative" and (len(response) < 80 or _looks_like_only_salutation(response, lang)):
+            if lang == "fr":
+                prompt_retry = (
+                    prompt
+                    + "\n\nIMPORTANT: Répondez en 3 à 5 phrases complètes. "
+                    "Incluez des excuses, une solution proposée, et le contact SAV si demandé. "
+                    "Ne répondez pas avec une simple formule de politesse."
+                )
+            else:
+                prompt_retry = (
+                    prompt
+                    + "\n\nIMPORTANT: Respond with 3 to 5 complete sentences. "
+                    "Include an apology, a proposed solution, and customer service contact if requested. "
+                    "Do not respond with only a greeting."
+                )
+            
             inputs = self.response_tokenizer(prompt_retry, return_tensors="pt")
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
-            outputs = self.response_model.generate(
+            outputs = self.response_model.generate(  # type: ignore[operator]
                 **inputs,
                 max_new_tokens=max_length,
                 temperature=0.2,
                 top_p=0.95,
                 do_sample=True,
                 repetition_penalty=1.15,
-                pad_token_id=self.response_tokenizer.eos_token_id,
-                eos_token_id=self.response_tokenizer.eos_token_id,
+                pad_token_id=getattr(self.response_tokenizer, "eos_token_id", None),
+                eos_token_id=getattr(self.response_tokenizer, "eos_token_id", None),
             )
             raw = self.response_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
-            response = raw.split("Réponse:", 1)[-1].strip() if "Réponse:" in raw else raw
+            
+            if lang == "fr":
+                response = raw.split("Réponse:", 1)[-1].strip() if "Réponse:" in raw else raw
+            else:
+                response = raw.split("Response:", 1)[-1].strip() if "Response:" in raw else raw
+            
             response = response.strip().strip('"').strip("'")
             response = " ".join(line.strip() for line in response.splitlines() if line.strip()).strip()
 
-        # Supprimer emails sauf celui du SAV calculé
+        # Protection email
         response = response.replace(email_service, "___EMAIL_SERVICE___")
         response = re.sub(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", "", response)
         response = response.replace("___EMAIL_SERVICE___", email_service)
 
-        # Limiter à 5 phrases complètes (évite phrase coupée + retire les \n)
+        # Limite phrases
         response = limit_sentences(response, max_sentences=5)
-
         return response.strip()
 
     def generate_all_responses(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -373,14 +370,18 @@ class ReviewAnalysisAndResponsePipeline:
         print("=" * 70 + "\n")
 
         df = df.copy()
-        responses = []
+        responses: List[str] = []
 
         total = len(df)
         print(f"Génération de {total} réponses...\n")
 
-        for idx, row in df.iterrows():
-            print(f"  [{idx+1}/{total}] {str(row.get('Nom', 'Client'))[:20]}... ({row.get('sentiment', 'neutral')})")
-            responses.append(self.generate_response(row.to_dict()))
+        for idx in range(len(df)):
+            row_dict = {str(k): v for k, v in df.iloc[idx].to_dict().items()}
+            nom_client = str(row_dict.get('Nom', 'Client'))[:20]
+            sentiment_avis = str(row_dict.get('sentiment', 'neutral'))
+            
+            print(f"  [{idx + 1}/{total}] {nom_client}... ({sentiment_avis})")
+            responses.append(self.generate_response(row_dict))
 
             if (idx + 1) % 10 == 0:
                 print(f"  {idx + 1} réponses générées\n")
@@ -389,48 +390,7 @@ class ReviewAnalysisAndResponsePipeline:
         print(f"\nGénération terminée: {total} réponses\n")
         return df
 
-    def run_full_pipeline(self, json_file: str, output_csv: str = "reviews_with_responses.csv") -> pd.DataFrame:
-        print("\n" + "=" * 70)
-        print("PIPELINE COMPLET: ANALYSE + GÉNÉRATION DE RÉPONSES")
-        print("=" * 70 + "\n")
 
-        df = self.load_and_analyze_json(json_file)
-
-        if "sentiment" not in df.columns:
-            print("ERREUR: La colonne 'sentiment' n'a pas été créée!")
-            print(f"Colonnes disponibles: {df.columns.tolist()}")
-            return df
-
-        df = self.generate_all_responses(df)
-
-        # Sanitize colonnes texte (évite CSV "multi-lignes")
-        for col in [
-            "produit_titre_complet",
-            "brand",
-            "Nom",
-            "Titre de l'avis",
-            "Avis",
-            "reponse_generee",
-        ]:
-            if col in df.columns:
-                df[col] = df[col].map(_sanitize_for_csv)
-
-        df.to_csv(
-            output_csv,
-            index=False,
-            encoding="utf-8",
-            sep=",",
-            quoting=csv.QUOTE_ALL,
-            escapechar="\\",
-        )
-        print(f"Fichier sauvegardé: {output_csv}")
-
-        return df
-
-
-# ----------------------------
-# Cache global (singleton)
-# ----------------------------
 _PIPELINE_CACHE: Dict[Tuple[str, str, bool], ReviewAnalysisAndResponsePipeline] = {}
 _PIPELINE_LOCK = threading.Lock()
 
@@ -457,32 +417,14 @@ def get_cached_pipeline(
         return pipeline
 
 
-def process_reviews_from_json(
-    json_file: str,
-    output_csv: str = "reviews_with_responses.csv",
-    use_gpu: bool = True,
-    sentiment_model: str = "nlptown/bert-base-multilingual-uncased-sentiment",
-    response_model: str = "mistralai/Mistral-7B-Instruct-v0.2",
-) -> pd.DataFrame:
-    """
-    JSON -> sentiment -> réponses -> CSV
-    """
-    pipeline = get_cached_pipeline(
-        use_gpu=use_gpu,
-        sentiment_model=sentiment_model,
-        response_model=response_model,
-    )
-    return pipeline.run_full_pipeline(json_file, output_csv)
-
-
 def generate_reply_for_single_review(
     product_title: str,
     brand: str,
-    avis: dict,
+    avis: Dict[str, Any],
     use_gpu: bool = True,
     sentiment_model: str = "nlptown/bert-base-multilingual-uncased-sentiment",
     response_model: str = "mistralai/Mistral-7B-Instruct-v0.2",
-) -> dict:
+) -> Dict[str, Any]:
     """
     Répondre à UN seul avis (réponse immédiate), en réutilisant le cache modèles.
     """
@@ -494,7 +436,7 @@ def generate_reply_for_single_review(
 
     sentiment_result = pipeline.analyze_sentiment(avis.get("contenu", ""))
 
-    row = {
+    row: Dict[str, Any] = {
         "Nom": avis.get("profil", ""),
         "Titre de l'avis": avis.get("titre_review", ""),
         "Avis": avis.get("contenu", ""),

@@ -1,0 +1,6 @@
+# Base de données SQLite
+*.db
+*.db-shm
+*.db-wal
+data/avis_scraping.db
+results/amazon_session_cookies.pkl

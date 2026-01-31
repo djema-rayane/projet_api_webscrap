@@ -21,6 +21,11 @@ dependencies = [
     "undetected-chromedriver>=3.5.5",
     "beautifulsoup4>=4.14.3",
     "sqlalchemy>=2.0.46",
+    "ruff>=0.14.10",
+    "mypy>=1.19.1",
+    "pandas-stubs>=2.3.3.260113",
+    "langdetect>=1.0.9",
+    "requests>=2.32.5",
 ]
 
 [project.optional-dependencies]

@@ -13,6 +13,7 @@ import random
 import pickle
 from pathlib import Path
 from datetime import datetime
+from typing import Optional, Dict, Any, List
 
 
 class AmazonReviewScraper:
@@ -29,11 +30,11 @@ class AmazonReviewScraper:
 
     def __init__(
         self,
-        profile_dir=None,
-        headless=False,
-        wait_seconds=15,
-        cookies_file: str | None = None,
-        db_session=None,  
+        profile_dir: Optional[str] = None,
+        headless: bool = False,
+        wait_seconds: int = 15,
+        cookies_file: Optional[str] = None,
+        db_session=None,
     ):
         self.options = webdriver.ChromeOptions()
 
@@ -84,16 +85,17 @@ class AmazonReviewScraper:
         # Cookies file (persistant)
         self.cookies_file = Path(cookies_file) if cookies_file else Path("amazon_session_cookies.pkl")
         self._session_bootstrapped = False
-        
+
         self.db_session = db_session
         self.session_scraping = None
         self.produit_actuel = None
         self.avis_count = 0
 
-    def _random_sleep(self, min_seconds=1.0, max_seconds=3.0):
+    def _random_sleep(self, min_seconds: float = 1.0, max_seconds: float = 3.0) -> None:
         time.sleep(random.uniform(min_seconds, max_seconds))
 
-    def _human_like_type(self, element, text, min_delay=0.1, max_delay=0.3):
+    def _human_like_type(self, element, text: str, min_delay: float = 0.1, max_delay: float = 0.3) -> None:
+        """Saisie de texte avec comportement humain (version simplifiée qui fonctionne)"""
         element.clear()
         self._random_sleep(0.3, 0.7)
 
@@ -103,7 +105,7 @@ class AmazonReviewScraper:
             if random.random() < 0.1:
                 time.sleep(random.uniform(0.5, 1.5))
 
-    def _move_to_element_human_like(self, element):
+    def _move_to_element_human_like(self, element) -> None:
         actions = ActionChains(self.driver)
 
         self.driver.execute_script(
@@ -115,42 +117,42 @@ class AmazonReviewScraper:
         actions.move_to_element(element).perform()
         self._random_sleep(0.3, 0.7)
 
-    def _human_click(self, element):
+    def _human_click(self, element) -> None:
         self._move_to_element_human_like(element)
         self._random_sleep(0.2, 0.5)
         element.click()
         self._random_sleep(0.5, 1.0)
 
-    def set_progress_callback(self, callback):
+    def set_progress_callback(self, callback) -> None:
         self.progress_callback = callback
 
-    def _update_progress(self, message: str):
+    def _update_progress(self, message: str) -> None:
         if self.progress_callback:
             self.progress_callback(message)
 
-    def _log(self, message: str):
+    def _log(self, message: str) -> None:
         if self.progress_callback:
             self.progress_callback(message)
         else:
             print(f"[{time.strftime('%H:%M:%S')}] {message}")
 
-    def set_db_session(self, db_session, session_scraping):
+    def set_db_session(self, db_session, session_scraping) -> None:
         """Configure la session BDD pour insertion directe"""
         self.db_session = db_session
         self.session_scraping = session_scraping
 
-    def _insert_avis_direct(self, review_data: dict, source: str = "amazon"):
+    def _insert_avis_direct(self, review_data: Dict[str, Any], source: str = "amazon") -> None:
         """Insère un avis directement en BDD pendant le scraping"""
         if not self.db_session or not self.session_scraping or not self.produit_actuel:
             return
-        
+
         from app.crud import inserer_avis
-        
+
         try:
             inserer_avis(
                 db=self.db_session,
-                session_id=self.session_scraping.id,
-                produit_id=self.produit_actuel.id,
+                session_id=int(self.session_scraping.id),  # type: ignore[attr-defined]
+                produit_id=int(self.produit_actuel.id),  # type: ignore[attr-defined]
                 source=source,
                 numero=self.avis_count + 1,
                 profil=review_data.get("profil"),
@@ -161,15 +163,15 @@ class AmazonReviewScraper:
                 date_avis=review_data.get("date"),
             )
             self.avis_count += 1
-            
+
             # Progress tous les 10 avis
             if self.avis_count % 10 == 0:
-                self._log(f"⚡ {self.avis_count} avis insérés en temps réel")
-        
+                self._log(f"{self.avis_count} avis insérés en temps réel")
+
         except Exception as e:
             self._log(f"Erreur insertion avis: {e}")
 
-    def debug_current_page(self):
+    def debug_current_page(self) -> None:
         try:
             url = self.driver.current_url
         except Exception:
@@ -181,7 +183,7 @@ class AmazonReviewScraper:
         self._log(f"DEBUG Page: {url}")
         self._log(f"DEBUG Titre: {title[:80]}")
 
-    def accept_cookies_if_present(self):
+    def accept_cookies_if_present(self) -> None:
         try:
             button = WebDriverWait(self.driver, 5).until(
                 EC.element_to_be_clickable((By.ID, "sp-cc-accept"))
@@ -192,7 +194,7 @@ class AmazonReviewScraper:
         except TimeoutException:
             pass
 
-    def save_cookies(self):
+    def save_cookies(self) -> None:
         """Sauvegarder TOUS les cookies Amazon après connexion réussie."""
         try:
             cookies = self.driver.get_cookies()
@@ -203,7 +205,7 @@ class AmazonReviewScraper:
             important_cookies = {"session-id", "ubid-acbfr", "x-acbfr", "at-acbfr"}
             for cookie in cookies:
                 if cookie.get("name") in important_cookies:
-                    self._log(f"   → Cookie clé: {cookie.get('name')}")
+                    self._log(f"   -> Cookie clé: {cookie.get('name')}")
 
         except Exception as e:
             self._log(f"Erreur sauvegarde cookies: {e}")
@@ -215,7 +217,7 @@ class AmazonReviewScraper:
         """
         try:
             if not self.cookies_file.exists():
-                self._log("ℹAucun fichier de cookies trouvé")
+                self._log("Aucun fichier de cookies trouvé")
                 return False
 
             with open(self.cookies_file, "rb") as f:
@@ -253,14 +255,14 @@ class AmazonReviewScraper:
             self._log(f"Erreur chargement cookies: {e}")
             return False
 
-    def clear_cookies(self):
+    def clear_cookies(self) -> None:
         """Supprimer le fichier de cookies (pour forcer une nouvelle connexion)."""
         try:
             if self.cookies_file.exists():
                 self.cookies_file.unlink()
                 self._log(f"Cookies supprimés: {self.cookies_file}")
             else:
-                self._log("ℹAucun fichier de cookies à supprimer")
+                self._log("Aucun fichier de cookies à supprimer")
         except Exception as e:
             self._log(f"Erreur suppression cookies: {e}")
 
@@ -292,7 +294,7 @@ class AmazonReviewScraper:
                 self._log("Impossible de vérifier le statut de connexion")
                 return False
 
-    def _check_error_box_text(self, selectors, keywords):
+    def _check_error_box_text(self, selectors: List[str], keywords: List[str]):
         for selector in selectors:
             try:
                 el = self.driver.find_element(By.CSS_SELECTOR, selector)
@@ -319,106 +321,52 @@ class AmazonReviewScraper:
             self._random_sleep(1.0, 2.0)
 
             # Clic sur compte
-            self._log("1️Clic sur 'Bonjour, Identifiez-vous'")
+            self._log("1. Clic sur 'Bonjour, Identifiez-vous'")
             account_button = self.wait.until(
                 EC.element_to_be_clickable((By.ID, "nav-link-accountList"))
             )
             self._human_click(account_button)
             self._random_sleep(2.0, 3.5)
 
-            # Email
-            self._log("2️Saisie email")
+            # Email - VERSION ULTRA SIMPLE
+            self._log("2. Saisie email")
             email_field = self.wait.until(EC.presence_of_element_located((By.ID, "ap_email")))
-            self._human_click(email_field)
+            email_field.click()  # Clic simple
             self._random_sleep(0.5, 1.0)
-            self._human_like_type(email_field, username, min_delay=0.08, max_delay=0.25)
+            
+            # Saisie directe sans _human_like_type
+            email_field.clear()
+            email_field.send_keys(username)
             self._random_sleep(0.8, 1.5)
 
-            current_value = email_field.get_attribute("value")
-            if current_value != username:
-                self._log(f"Texte saisi différent : '{current_value}' vs '{username}' (retry)")
-                email_field.clear()
-                self._random_sleep(0.5, 1.0)
-                self._human_like_type(email_field, username, min_delay=0.1, max_delay=0.3)
-                self._random_sleep(0.5, 1.0)
-
             continue_button = self.wait.until(EC.element_to_be_clickable((By.ID, "continue")))
-            current_url = self.driver.current_url
-            self._human_click(continue_button)
+            continue_button.click()
+            self._random_sleep(2.0, 3.0)
 
-            # Attendre page password / erreur email
-            start = time.time()
-            while time.time() - start < 15:
-                try:
-                    self.driver.find_element(By.ID, "ap_password")
-                    break
-                except NoSuchElementException:
-                    pass
+            # Attendre page password
+            self.wait.until(EC.presence_of_element_located((By.ID, "ap_password")))
 
-                has_error, msg = self._check_error_box_text(
-                    selectors=[
-                        "div.a-alert-error",
-                        "#auth-error-message-box",
-                        "div.a-box-inner.a-alert-container",
-                    ],
-                    keywords=[
-                        "incorrect", "introuvable", "invalide",
-                        "erreur", "problème", "n'existe pas",
-                    ],
-                )
-                if has_error:
-                    self._log(f"Erreur email: {msg}")
-                    return False
-
-                if self.driver.current_url != current_url:
-                    pass
-
-                time.sleep(0.5)
-
-            # Password
-            self._log("3️Saisie mot de passe (mode humain)")
-            password_field = self.wait.until(EC.presence_of_element_located((By.ID, "ap_password")))
-            self._human_click(password_field)
+            # Password - VERSION ULTRA SIMPLE
+            self._log("3. Saisie mot de passe")
+            password_field = self.driver.find_element(By.ID, "ap_password")
+            password_field.click()  # Clic simple
             self._random_sleep(0.5, 1.0)
-            self._human_like_type(password_field, password, min_delay=0.08, max_delay=0.25)
+            
+            # Saisie directe
+            password_field.clear()
+            password_field.send_keys(password)
             self._random_sleep(1.0, 2.0)
 
-            current_url_pw = self.driver.current_url
             password_field.send_keys(Keys.RETURN)
-            self._random_sleep(2.0, 4.0)
+            self._random_sleep(3.0, 5.0)
 
-            # Vérification login / erreur password
-            start = time.time()
-            while time.time() - start < 15:
-                if self.driver.current_url != current_url_pw and "/ap/signin" not in self.driver.current_url:
-                    break
-                if self.is_logged_in():
-                    break
-
-                has_error, msg = self._check_error_box_text(
-                    selectors=[
-                        "div.a-alert-error",
-                        "#auth-error-message-box",
-                        "div.a-box-inner.a-alert-container",
-                    ],
-                    keywords=[
-                        "incorrect", "invalide", "erreur",
-                        "problème", "mot de passe", "password", "réessayer",
-                    ],
-                )
-                if has_error:
-                    self._log(f"Erreur password: {msg}")
-                    return False
-
-                time.sleep(0.5)
-
-            time.sleep(2)
+            # Vérification
             ok = self.is_logged_in()
             if ok:
                 self._log("CONNEXION RÉUSSIE")
                 self.save_cookies()
             else:
-                self._log("ÉCHEC CONNEXION (vérif finale)")
+                self._log("ÉCHEC CONNEXION")
             return ok
 
         except Exception as e:
@@ -433,8 +381,8 @@ class AmazonReviewScraper:
 
     def ensure_logged_in(
         self,
-        username: str | None = None,
-        password: str | None = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         cookies_only: bool = False,
     ) -> bool:
         """
@@ -449,7 +397,7 @@ class AmazonReviewScraper:
 
             # Bootstrap domaine obligatoire avant add_cookie
             if not getattr(self, "_session_bootstrapped", False):
-                self._log("0️Bootstrap amazon.fr")
+                self._log("0. Bootstrap amazon.fr")
                 self.driver.get("https://www.amazon.fr")
                 time.sleep(2)
                 self.accept_cookies_if_present()
@@ -457,11 +405,11 @@ class AmazonReviewScraper:
 
             # 1) Essai cookies
             if self.cookies_file.exists():
-                self._log("1️Cookies détectés → tentative session via cookies")
+                self._log("1. Cookies détectés -> tentative session via cookies")
                 cookies_loaded = self.load_cookies()
 
                 if cookies_loaded:
-                    self._log("   → Refresh")
+                    self._log("   -> Refresh")
                     self.driver.refresh()
                     time.sleep(3)
 
@@ -480,25 +428,25 @@ class AmazonReviewScraper:
                 self._log("Cookies présents mais session non validée")
 
                 if cookies_only:
-                    self._log("cookies_only=True → pas de login manuel")
+                    self._log("cookies_only=True -> pas de login manuel")
                     return False
 
             else:
-                self._log("ℹAucun fichier cookies → login requis")
+                self._log("Aucun fichier cookies -> login requis")
 
             # 2) Fallback login manuel
             if cookies_only:
-                self._log("cookies_only=True → pas de login manuel")
+                self._log("cookies_only=True -> pas de login manuel")
                 return False
 
             if not username or not password:
                 self._log("Identifiants manquants")
                 return False
 
-            self._log("2️Fallback login manuel…")
+            self._log("2. Fallback login manuel...")
             ok = self.login_manual(username, password)
             if ok:
-                self._log("Login OK → sauvegarde cookies")
+                self._log("Login OK -> sauvegarde cookies")
                 self.save_cookies()
                 return True
 
@@ -509,7 +457,7 @@ class AmazonReviewScraper:
             self._log(f"Erreur ensure_logged_in: {e}")
             return False
 
-    def set_cookies(self, cookies: dict):
+    def set_cookies(self, cookies: Dict[str, str]) -> None:
         """
         Injecter des cookies (dict) dans la session.
         Note: il faut être sur le domaine amazon.fr avant add_cookie.
@@ -528,12 +476,12 @@ class AmazonReviewScraper:
     # =========================================================
     # AMAZON NAV (Search mode)
     # =========================================================
-    def open_amazon(self):
+    def open_amazon(self) -> None:
         self._update_progress("Ouverture d'Amazon.fr")
         self.driver.get("https://www.amazon.fr")
         self.accept_cookies_if_present()
 
-    def search(self, query: str):
+    def search(self, query: str) -> None:
         self._update_progress(f"Recherche de '{query}'")
         search_bar = self.wait.until(
             EC.presence_of_element_located((By.ID, "twotabsearchtextbox"))
@@ -544,7 +492,7 @@ class AmazonReviewScraper:
         time.sleep(2)
         self._update_progress("Résultats affichés")
 
-    def count_products_on_page(self):
+    def count_products_on_page(self) -> int:
         products = self.driver.find_elements(
             By.CSS_SELECTOR,
             "div.a-section.puis-padding-left-small.puis-padding-right-small",
@@ -556,7 +504,7 @@ class AmazonReviewScraper:
             )
         return len(products)
 
-    def click_next_page(self):
+    def click_next_page(self) -> bool:
         self._update_progress("Passage à la page suivante...")
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
         time.sleep(1)
@@ -592,7 +540,7 @@ class AmazonReviewScraper:
     # =========================================================
     # Product data extraction
     # =========================================================
-    def extract_brand(self):
+    def extract_brand(self) -> str:
         """Extraire la marque du produit"""
         brand = "Marque non disponible"
 
@@ -618,7 +566,7 @@ class AmazonReviewScraper:
 
         return brand
 
-    def extract_product_title(self):
+    def extract_product_title(self) -> str:
         """Extraire le titre du produit (compatible mode recherche et URL)"""
         product_title = "Titre non disponible"
 
@@ -640,7 +588,7 @@ class AmazonReviewScraper:
 
         return product_title
 
-    def click_product_reviews(self, product_index=1):
+    def click_product_reviews(self, product_index: int = 1) -> str:
         self._update_progress(f"Accès aux avis du produit #{product_index}")
         time.sleep(3)
 
@@ -743,7 +691,7 @@ class AmazonReviewScraper:
         except NoSuchElementException:
             raise Exception(f"Aucun lien d'avis trouvé pour le produit #{product_index}")
 
-    def go_back(self):
+    def go_back(self) -> None:
         self._update_progress("Retour à la page de résultats")
         self.driver.back()
         time.sleep(3)
@@ -760,10 +708,15 @@ class AmazonReviewScraper:
     # =========================================================
     # Reviews extraction (base)
     # =========================================================
-    def extract_reviews(self, france_only=True, limit=None, insert_db=True):
+    def extract_reviews(
+        self,
+        france_only: bool = True,
+        limit: Optional[int] = None,
+        insert_db: bool = True
+    ) -> List[Dict[str, Any]]:
         """
         Extrait les avis ET les insère directement si BDD configurée
-        
+
         CHANGEMENT : insert_db=True par défaut si db_session existe
         """
         self._update_progress("Extraction des avis en cours...")
@@ -779,13 +732,13 @@ class AmazonReviewScraper:
 
         self._update_progress(f"{len(review_blocks)} avis détectés sur la page")
 
-        reviews = []
+        reviews: List[Dict[str, Any]] = []
         skipped = 0
 
         for review_block in review_blocks:
             if limit and len(reviews) >= limit:
                 break
-                
+
             try:
                 profile_name = "Anonyme"
                 try:
@@ -805,8 +758,8 @@ class AmazonReviewScraper:
                     skipped += 1
                     continue
 
-                date_clean = re.search(r"le\s+(.+)$", date_full)
-                date_clean = date_clean.group(1) if date_clean else date_full
+                date_clean_match = re.search(r"le\s+(.+)$", date_full)
+                date_clean = date_clean_match.group(1) if date_clean_match else date_full
 
                 star_element = None
                 star_text = ""
@@ -826,7 +779,7 @@ class AmazonReviewScraper:
                 if star_element:
                     try:
                         star_span = star_element.find_element(By.TAG_NAME, "span")
-                        star_text = star_span.text or star_span.get_attribute("textContent")
+                        star_text = star_span.text or star_span.get_attribute("textContent") or ""
 
                         if star_text:
                             star_match = re.search(r"(\d+[,.]?\d*)", star_text)
@@ -860,11 +813,11 @@ class AmazonReviewScraper:
                     "date": date_clean,
                     "contenu": content,
                 }
-                
+
                 # INSERTION DIRECTE EN BDD
                 if insert_db and self.db_session:
                     self._insert_avis_direct(review_data)
-                
+
                 reviews.append(review_data)
 
             except Exception:
@@ -876,7 +829,12 @@ class AmazonReviewScraper:
     # =========================================================
     # MODE URL (base)
     # =========================================================
-    def scrape_single_product_by_url(self, product_url, france_only=True, limit=None):
+    def scrape_single_product_by_url(
+        self,
+        product_url: str,
+        france_only: bool = True,
+        limit: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
         MODE URL: Scrape un seul produit à partir de son URL Amazon
         Extrait les avis DIRECTEMENT depuis la page produit (section "Commentaires")
@@ -929,7 +887,13 @@ class AmazonReviewScraper:
     # =========================================================
     # MODE SEARCH (base)
     # =========================================================
-    def scrape_multiple_products(self, query, nb_products, france_only=True, limit_per_product=None):
+    def scrape_multiple_products(
+        self,
+        query: str,
+        nb_products: int,
+        france_only: bool = True,
+        limit_per_product: Optional[int] = None
+    ) -> Dict[str, Any]:
         """
         MODE RECHERCHE: Scrape plusieurs produits via une recherche
         """
@@ -940,7 +904,7 @@ class AmazonReviewScraper:
             nb_products_on_page = self.count_products_on_page()
             self._update_progress(f"{nb_products_on_page} produits sur la page")
 
-            all_products_data = []
+            all_products_data: List[Dict[str, Any]] = []
             total_scraped = 0
             i = 1
 
@@ -1087,14 +1051,18 @@ class AmazonReviewScraper:
             except Exception:
                 pass
 
-            self._log("ℹBouton traduction introuvable (peut-être déjà en FR)")
+            self._log("Bouton traduction introuvable (peut-être déjà en FR)")
             return True
 
         except Exception as e:
             self._log(f"Erreur traduction: {e}")
             return True
 
-    def extract_reviews_from_page_auth(self, france_only=False, insert_db=True):
+    def extract_reviews_from_page_auth(
+        self,
+        france_only: bool = False,
+        insert_db: bool = True
+    ) -> List[Dict[str, Any]]:
         """
         Extrait les avis depuis la page complète (mode auth)
         AVEC insertion directe
@@ -1116,7 +1084,7 @@ class AmazonReviewScraper:
 
             self._log(f"{len(review_blocks)} avis détectés")
 
-            reviews = []
+            reviews: List[Dict[str, Any]] = []
             skipped = 0
 
             for review_block in review_blocks:
@@ -1210,10 +1178,10 @@ class AmazonReviewScraper:
                             "date": date_clean,
                             "contenu": content,
                         }
-                        
+
                         if insert_db and self.db_session:
                             self._insert_avis_direct(review_data)
-                        
+
                         reviews.append(review_data)
 
                 except Exception:
@@ -1240,7 +1208,7 @@ class AmazonReviewScraper:
                 next_li = self.driver.find_element(By.CSS_SELECTOR, "li.a-last")
                 classes = next_li.get_attribute("class") or ""
                 if "a-disabled" in classes:
-                    self._log("ℹDernière page d'avis atteinte")
+                    self._log("Dernière page d'avis atteinte")
                     return False
                 next_button = next_li.find_element(By.TAG_NAME, "a")
             except NoSuchElementException:
@@ -1294,12 +1262,12 @@ class AmazonReviewScraper:
     def scrape_product_reviews_auth(
         self,
         product_url: str,
-        username: str | None = None,
-        password: str | None = None,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         limit: int = 30,
         france_only: bool = False,
-        cookies_only: bool = False,   
-    ):
+        cookies_only: bool = False,
+    ) -> Optional[Dict[str, Any]]:
         """
         MODE URL_AUTH:
         Scraper les avis d'un produit via la page complète des avis.
@@ -1322,7 +1290,7 @@ class AmazonReviewScraper:
                 cookies_only=cookies_only
             ):
                 if cookies_only:
-                    self._log("Cookies invalides et cookies_only=True → stop")
+                    self._log("Cookies invalides et cookies_only=True -> stop")
                 else:
                     self._log("Impossible de se connecter (cookies invalides + login KO ou creds manquants)")
                 return None
@@ -1352,7 +1320,7 @@ class AmazonReviewScraper:
             self.click_traduire_commentaires()
 
             # Scraping paginé
-            all_reviews = []
+            all_reviews: List[Dict[str, Any]] = []
             page = 1
             max_pages = 50
 
@@ -1373,7 +1341,7 @@ class AmazonReviewScraper:
                     break
 
                 if not self.click_next_page_reviews_auth():
-                    self._log("ℹFin de la pagination")
+                    self._log("Fin de la pagination")
                     break
 
                 page += 1

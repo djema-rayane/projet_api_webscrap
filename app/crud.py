@@ -5,7 +5,7 @@ Gestion complète du cycle de vie des avis : insertion, lecture, mise à jour, a
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from sqlalchemy import func, and_, or_
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.database import SessionScraping, Produit, Avis
@@ -18,7 +18,7 @@ from app.database import SessionScraping, Produit, Avis
 
 def creer_session_scraping(
     db: Session,
-    task_id: str,  # ✅ AJOUT
+    task_id: str,
     type_scraping: str,
     source: str,
     query: Optional[str] = None,
@@ -78,31 +78,25 @@ def finaliser_session_scraping(
     duree_secondes: Optional[float] = None,
     statut: str = "completed",
     erreur: Optional[str] = None,
-) -> SessionScraping:
+) -> Optional[SessionScraping]:
     """
     Finalise une session de scraping avec les statistiques finales.
-    
-    Args:
-        db: Session SQLAlchemy
-        session_id: ID de la session à finaliser
-        nb_avis_extraits: Nombre total d'avis extraits
-        nb_produits_scrapes: Nombre de produits scrapés (optionnel)
-        duree_secondes: Durée du scraping en secondes
-        statut: Statut final ('completed', 'failed', 'interrupted')
-        erreur: Message d'erreur si échec
-    
+
     Returns:
-        Instance SessionScraping mise à jour
+        Instance SessionScraping mise à jour, ou None si introuvable
     """
     session = db.query(SessionScraping).filter(SessionScraping.id == session_id).first()
-    if session:
-        session.nb_avis_extraits = nb_avis_extraits
-        session.nb_produits_scrapes = nb_produits_scrapes
-        session.duree_secondes = duree_secondes
-        session.statut = statut
-        session.erreur = erreur
-        db.commit()
-        db.refresh(session)
+    if session is None:
+        return None
+
+    session.nb_avis_extraits = nb_avis_extraits  # type: ignore[assignment]
+    session.nb_produits_scrapes = nb_produits_scrapes  # type: ignore[assignment]
+    session.duree_secondes = duree_secondes  # type: ignore[assignment]
+    session.statut = statut  # type: ignore[assignment]
+    session.erreur = erreur  # type: ignore[assignment]
+
+    db.commit()
+    db.refresh(session)
     return session
 
 
@@ -468,7 +462,7 @@ def mettre_a_jour_sentiment(
     avis_id: int,
     sentiment: str,
     score_sentiment: float,
-) -> Avis:
+) -> Optional[Avis]:  # Changé de Avis à Optional[Avis]
     """
     Met à jour l'analyse de sentiment d'un avis.
     
@@ -479,14 +473,14 @@ def mettre_a_jour_sentiment(
         score_sentiment: Score de confiance (0-1)
     
     Returns:
-        Instance Avis mise à jour
+        Instance Avis mise à jour ou None si introuvable
     """
     avis = db.query(Avis).filter(Avis.id == avis_id).first()
     if avis:
-        avis.sentiment = sentiment
-        avis.score_sentiment = score_sentiment
-        avis.date_analyse = datetime.now()
-        avis.statut = "analyzed"
+        avis.sentiment = sentiment  # type: ignore[assignment]
+        avis.score_sentiment = score_sentiment  # type: ignore[assignment]
+        avis.date_analyse = datetime.now()  # type: ignore[assignment]
+        avis.statut = "analyzed"  # type: ignore[assignment]
         db.commit()
         db.refresh(avis)
     return avis
@@ -496,7 +490,7 @@ def mettre_a_jour_reponse(
     db: Session,
     avis_id: int,
     reponse_generee: str,
-) -> Avis:
+) -> Optional[Avis]:  # Changé de Avis à Optional[Avis]
     """
     Met à jour la réponse générée pour un avis.
     
@@ -506,13 +500,13 @@ def mettre_a_jour_reponse(
         reponse_generee: Texte de la réponse générée
     
     Returns:
-        Instance Avis mise à jour
+        Instance Avis mise à jour ou None si introuvable
     """
     avis = db.query(Avis).filter(Avis.id == avis_id).first()
     if avis:
-        avis.reponse_generee = reponse_generee
-        avis.date_reponse = datetime.now()
-        avis.statut = "responded"
+        avis.reponse_generee = reponse_generee  # type: ignore[assignment]
+        avis.date_reponse = datetime.now()  # type: ignore[assignment]
+        avis.statut = "responded"  # type: ignore[assignment]
         db.commit()
         db.refresh(avis)
     return avis

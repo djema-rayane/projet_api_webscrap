@@ -2,7 +2,6 @@ from typing import Dict
 from datetime import datetime
 import uuid
 import os
-from app.config import settings
 
 class TaskManager:
     def __init__(self):
@@ -22,10 +21,10 @@ class TaskManager:
         }
         return task_id
     
-    def get_task(self, task_id: str) -> dict:
+    def get_task(self, task_id: str) -> dict | None:
         return self.tasks.get(task_id)
     
-    def get_all_tasks(self) -> dict:
+    def get_all_tasks(self) -> dict | None :
         return self.tasks
     
     def update_status(self, task_id: str, status: str):
@@ -53,11 +52,8 @@ class TaskManager:
     def delete_task(self, task_id: str) -> bool:
         if task_id in self.tasks:
             task = self.tasks[task_id]
-            if task["result_file"] and os.path.exists(task["result_file"]):
-                try:
-                    os.remove(task["result_file"])
-                except:
-                    pass
+            if task["result_file"] and os.path.exists(task["result_file"]):  
+                os.remove(task["result_file"])
             del self.tasks[task_id]
             return True
         return False

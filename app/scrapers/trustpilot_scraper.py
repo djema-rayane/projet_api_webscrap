@@ -2,7 +2,6 @@ import json
 import re
 from datetime import datetime
 from typing import Optional, Any, Dict, List, Tuple
-
 import requests
 from bs4 import BeautifulSoup
 

@@ -1,10 +1,8 @@
-import os
 from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.database import get_db
 from app.crud import get_session_by_task_id
 from app.core.analysis_task_manager import analysis_task_manager
@@ -56,7 +54,7 @@ async def analyze_sentiment(
     db: Session = Depends(get_db)
 ):
     """
-    🔍 Analyser les sentiments des avis NON ANALYSÉS.
+    Analyser les sentiments des avis NON ANALYSÉS.
     
     Cette route remplit UNIQUEMENT la colonne `sentiment` dans la BDD.
     Elle ne génère PAS de réponses.
@@ -85,12 +83,12 @@ async def analyze_sentiment(
     4. Ne touche PAS à `reponse_generee`
     """
     
-    print(f"🔍 DEBUG: Analyse sentiment - scrape_task_id={request.scrape_task_id}")
+    print(f"DEBUG: Analyse sentiment - scrape_task_id={request.scrape_task_id}")
     
     # Validation
     if request.scrape_task_id:
         session = get_session_by_task_id(db, request.scrape_task_id)
-        print(f"🔍 DEBUG: Session trouvée = {session is not None}")
+        print(f"DEBUG: Session trouvée = {session is not None}")
         if not session:
             raise HTTPException(
                 status_code=404,
@@ -105,17 +103,17 @@ async def analyze_sentiment(
     
     # Créer un task_id
     analysis_task_id = analysis_task_manager.create_task(f"sentiment_{target}")
-    print(f"🔍 DEBUG: analysis_task_id créé = {analysis_task_id}")
+    print(f"DEBUG: analysis_task_id créé = {analysis_task_id}")
     
     # Lancer en arrière-plan
-    print(f"🔍 DEBUG: Ajout de la tâche sentiment en background...")
+    print("DEBUG: Ajout de la tâche sentiment en background...")
     background_tasks.add_task(
         execute_sentiment_analysis_task,
         analysis_task_id,
         request.scrape_task_id,
         request.use_gpu,
     )
-    print(f"🔍 DEBUG: Tâche ajoutée")
+    print("DEBUG: Tâche ajoutée")
     
     return AnalysisResponse(
         analysis_task_id=analysis_task_id,
@@ -136,7 +134,7 @@ async def generate_responses(
     db: Session = Depends(get_db)
 ):
     """
-    💬 Générer les réponses pour les avis ANALYSÉS sans réponse.
+    Générer les réponses pour les avis ANALYSÉS sans réponse.
     
     Cette route remplit UNIQUEMENT la colonne `reponse_generee` dans la BDD.
     Elle requiert que les avis aient déjà un `sentiment` (via /sentiment).
@@ -169,12 +167,12 @@ async def generate_responses(
     4. (Optionnel) Exporte en CSV/JSON
     """
     
-    print(f"🔍 DEBUG: Génération réponses - scrape_task_id={request.scrape_task_id}")
+    print(f"DEBUG: Génération réponses - scrape_task_id={request.scrape_task_id}")
     
     # Validation
     if request.scrape_task_id:
         session = get_session_by_task_id(db, request.scrape_task_id)
-        print(f"🔍 DEBUG: Session trouvée = {session is not None}")
+        print(f"DEBUG: Session trouvée = {session is not None}")
         if not session:
             raise HTTPException(
                 status_code=404,
@@ -189,10 +187,10 @@ async def generate_responses(
     
     # Créer un task_id
     analysis_task_id = analysis_task_manager.create_task(f"responses_{target}")
-    print(f"🔍 DEBUG: analysis_task_id créé = {analysis_task_id}")
+    print(f"DEBUG: analysis_task_id créé = {analysis_task_id}")
     
     # Lancer en arrière-plan
-    print(f"🔍 DEBUG: Ajout de la tâche responses en background...")
+    print("DEBUG: Ajout de la tâche responses en background...")
     background_tasks.add_task(
         execute_response_generation_task,
         analysis_task_id,
@@ -201,7 +199,7 @@ async def generate_responses(
         request.output_csv,
         request.output_json,
     )
-    print(f"🔍 DEBUG: Tâche ajoutée")
+    print("DEBUG: Tâche ajoutée")
     
     return AnalysisResponse(
         analysis_task_id=analysis_task_id,

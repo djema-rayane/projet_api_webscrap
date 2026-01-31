@@ -1,8 +1,6 @@
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
-from app.models.schemas import TaskStatus, TasksList
+from fastapi import APIRouter
+from app.models.schemas import TasksList
 from app.core.task_manager import task_manager
-import os
 
 router = APIRouter(prefix="/tasks", tags=["Historique des tâches"])
 
